@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace i18nex.ZipLoader
 {
@@ -59,6 +60,8 @@ namespace i18nex.ZipLoader
             langPath = path;
             Core.Logger.LogInfo($"Loading language \"{CurrentLanguage}\"");
 
+            //Task.Factory.StartNew(() => ZipLoad("Script", Scripts));
+            //Task.Factory.StartNew(() => ZipLoad("Textures", Textures));
             ZipLoad("Script", Scripts);
             ZipLoad("Textures", Textures);
             //ZipLoad("Script", ScriptZips,ScriptEntrys);
@@ -174,11 +177,11 @@ namespace i18nex.ZipLoader
 
         public IEnumerable<string> GetTextureTranslationFileNames()
         {
-            var texPath = Path.Combine(langPath, "Textures");
-            if (!Directory.Exists(texPath))
-                return null;
-            return Directory.GetFiles(texPath, "*.png", SearchOption.AllDirectories);
-            //return TextureEntrys.Keys;//.Where(x => x.EndsWith(".png"));
+            //var texPath = Path.Combine(langPath, "Textures");
+            //if (!Directory.Exists(texPath))
+            //    return null;
+            //return Directory.GetFiles(texPath, "*.png", SearchOption.AllDirectories);
+            return Textures.Keys;//.Where(x => x.EndsWith(".png"));
         }
 
         public SortedDictionary<string, IEnumerable<string>> GetUITranslationFileNames()
