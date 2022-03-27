@@ -148,18 +148,7 @@ namespace i18nex.ZipLoader
                 }
                 zfile = entrys[path];                
                 stream = zips[path].GetInputStream(zfile);                
-                /*
-                byte[] buffer = new byte[16 * 1024];
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    int read;
-                    while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-                        ms.Write(buffer, 0, read);
-                    }
-                    //return ms.ToArray();
-                }
-                */
+
                 Core.Logger.LogInfo($"GetStream , {zfile?.Name} , {zfile?.Offset} , {zfile?.Size} , {zfile?.CompressedSize} , {zfile?.Crc} , {zfile?.ZipFileIndex} , {stream?.Length} ");//  , {zip.FindEntry(name, true)}
             }
             catch (Exception e)
