@@ -2,6 +2,8 @@
 //using BepInEx.Logging;
 using COM3D2.i18nEx.Core;
 using COM3D2.i18nEx.Core.Loaders;
+using COM3D2.i18nEx.Core.Util;
+using ICSharpCode.SharpZipLib.Core;
 using ICSharpCode.SharpZipLib.Zip;
 using System;
 using System.Collections.Generic;
@@ -27,8 +29,10 @@ namespace i18nex.ZipLoader
         public string CurrentLanguage { get; private set; }
         private static string langPath;
 
-        internal readonly static Dictionary<string, ZipFile> fileZips =new Dictionary<string, ZipFile>();
-        internal readonly static Dictionary<string, ZipEntry> fileEntrys =new Dictionary<string, ZipEntry>();
+        internal readonly static Dictionary<string, ZipFile> ScriptZips = new Dictionary<string, ZipFile>();
+        internal readonly static Dictionary<string, ZipEntry> ScriptEntrys = new Dictionary<string, ZipEntry>();
+        internal readonly static Dictionary<string, ZipFile> TextureZips = new Dictionary<string, ZipFile>();
+        internal readonly static Dictionary<string, ZipEntry> TextureEntrys = new Dictionary<string, ZipEntry>();
 
         /*
         public ZipLoader()
@@ -47,6 +51,9 @@ namespace i18nex.ZipLoader
             CurrentLanguage = name;
             langPath = path;
             Core.Logger.LogInfo($"Loading language \"{CurrentLanguage}\"");
+
+            ZipLoad("Script", ScriptZips,ScriptEntrys);
+            ZipLoad("Textures", TextureZips, TextureEntrys);
         }
 
         public void UnloadCurrentTranslation()
@@ -56,78 +63,141 @@ namespace i18nex.ZipLoader
             langPath = null;
         }
 
-        public IEnumerable<string> GetScriptTranslationFileNames()
+        public void ZipLoad(string type, Dictionary<string, ZipFile> zips, Dictionary<string, ZipEntry> entrys)
         {
-            string path = Path.Combine(langPath, "Script");
-            if (!Directory.Exists(path))
-                return null;
-
             ZipConstants.DefaultCodePage = Encoding.UTF8.CodePage;
 
-            Core.Logger.LogInfo($"DefaultCodePage : {ZipConstants.DefaultCodePage}");
+            Core.Logger.LogInfo($"ZipLoad : {type} {ZipConstants.DefaultCodePage}");
+
+            //string path = langPath;// Path.Combine(langPath, "Script");
+            string path = Path.Combine(langPath, type);
+            if (!Directory.Exists(path))
+                return;
+
+            zips.Clear();
+            entrys.Clear();
 
             foreach (string zipPath in Directory.GetFiles(path, "*.zip", SearchOption.AllDirectories))
             {
                 ZipFile zip = new ZipFile(zipPath);
-#if debug
                 Core.Logger.LogInfo($"zip : {zipPath} , {zip.Count}");
+#if Debug
 #endif
                 foreach (ZipEntry zfile in zip)
                 {
                     if (!zfile.IsFile) continue;
-                                        
-                    var fileName = Path.GetFileNameWithoutExtension(zfile.Name);
-#if debug
+                    if (!zfile.CanDecompress)
+                    {
+                        Core.Logger.LogInfo($"Can't Decompress {zfile.Name}");//  , {zip.FindEntry(name, true)}
+                        continue;
+                    }
+
+
+                    //var fileName = Path.GetFileNameWithoutExtension(zfile.Name);
+                    var fileName = Path.GetFileName(zfile.Name);
+#if Debug
                     Core.Logger.LogInfo($"{fileName} , {zfile.Name} , {zfile.IsDirectory} , {zfile.IsFile}");//  , {zip.FindEntry(name, true)}
 #endif
-                    fileZips[fileName] = zip;
-                    fileEntrys[fileName] = zfile;
-
+                    zips[fileName] = zip;
+                    entrys[fileName] = zfile;
                 }
             }
 
-            return fileEntrys.Keys;
-               // return Directory.GetFiles(path, "*.zip", SearchOption.AllDirectories);
+            Core.Logger.LogInfo($"ZipLoad : {type} , {zips.Count} , {entrys.Count}");
+        }
+
+        public IEnumerable<string> GetScriptTranslationFileNames()
+        {
+            return ScriptEntrys.Keys;//.Where(x => x.EndsWith(".txt"));
         }
 
         public IEnumerable<string> GetTextureTranslationFileNames()
         {
-            return null;
+            return TextureEntrys.Keys;//.Where(x => x.EndsWith(".png"));
         }
 
         public SortedDictionary<string, IEnumerable<string>> GetUITranslationFileNames()
         {
-            return null;
+            var uiPath = Path.Combine(langPath, "UI");
+            if (!Directory.Exists(uiPath))
+                return null;
+
+            var dict = new SortedDictionary<string, IEnumerable<string>>(StringComparer.InvariantCultureIgnoreCase);
+
+            foreach (var directory in Directory.GetDirectories(uiPath, "*", SearchOption.TopDirectoryOnly))
+            {
+                var dirName = directory.Splice(uiPath.Length, -1).Trim('\\', '/');
+                dict.Add(dirName,
+                         Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories)
+                                  .Select(s => s.Splice(directory.Length + 1, -1)));
+            }
+
+            return dict;
+        }
+
+        private static Stream GetStream(string path, Dictionary<string, ZipFile> zips, Dictionary<string, ZipEntry> entrys)
+        {
+            Stream stream = null;
+            ZipEntry zfile = null;
+            try
+            {
+                Core.Logger.LogInfo($"GetStream , {path} , {entrys.ContainsKey(path)}");//  , {zip.FindEntry(name, true)}
+                if (!entrys.ContainsKey(path))
+                {
+                    return stream;
+                }
+                zfile = entrys[path];                
+                stream = zips[path].GetInputStream(zfile);                
+                /*
+                byte[] buffer = new byte[16 * 1024];
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    int read;
+                    while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        ms.Write(buffer, 0, read);
+                    }
+                    //return ms.ToArray();
+                }
+                */
+                Core.Logger.LogInfo($"GetStream , {zfile?.Name} , {zfile?.Offset} , {zfile?.Size} , {zfile?.CompressedSize} , {zfile?.Crc} , {zfile?.ZipFileIndex} , {stream?.Length} ");//  , {zip.FindEntry(name, true)}
+            }
+            catch (Exception e)
+            {
+                Core.Logger.LogError($"GetStream , {path} , {e}");
+            }
+            return stream;
         }
 
         public Stream OpenScriptTranslation(string path)
         {
-            Stream stream=null;
-            ZipEntry zfile = null;
-            try
-            {
-                zfile = fileEntrys[path];
-                stream = fileZips[path].GetInputStream(fileEntrys[path]);
-                Core.Logger.LogInfo($"OpenScriptTranslation , {path} , {zfile?.Name} , {stream?.Length}");//  , {zip.FindEntry(name, true)}
-            }
-            catch (Exception e)
-            {
-                Core.Logger.LogError($"OpenScriptTranslation , {path} , {e}");
-            }
+            Core.Logger.LogInfo($"OpenScriptTranslation , {path} ");
+
+            Stream stream = GetStream(path, ScriptZips, ScriptEntrys);
+            //using (FileStream fileStream = File.Create(Path.Combine(langPath, "Script\\" + path)))
+           // {
+            //    StreamUtils.Copy(stream, fileStream, new byte[4096]);
+           // }
             return stream;
-            // return !File.Exists(path) ? null : File.OpenRead(path);
         }
 
         public Stream OpenTextureTranslation(string path)
         {
             Core.Logger.LogInfo($"OpenTextureTranslation , {path} ");
-            return null;
+
+            Stream stream = GetStream(path, TextureZips, TextureEntrys);
+            //using (FileStream fileStream = File.Create(Path.Combine(langPath, "Textures\\"+path)))
+            //{
+            //    StreamUtils.Copy(stream, fileStream, new byte[4096]);
+            //}
+            return stream;
+            //return null;
         }
 
         public Stream OpenUiTranslation(string path)
         {
-            Core.Logger.LogInfo($"OpenUiTranslation , {path} ");
-            return null;
+            path = Utility.CombinePaths(langPath, "UI", path);
+            return !File.Exists(path) ? null : File.OpenRead(path);
         }
 
     }
