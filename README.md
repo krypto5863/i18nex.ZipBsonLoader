@@ -5,9 +5,9 @@
 Script zip support  
 Script txt support  
 Textures zip support  
-Textures png support
-UI zip not support
-UI csv support
+Textures png support  
+UI zip not support  
+UI csv support  
 
 # input  
 
