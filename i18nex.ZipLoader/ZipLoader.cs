@@ -62,18 +62,24 @@ namespace i18nex.ZipLoader
             if (!Directory.Exists(path))
                 return null;
 
+            ZipConstants.DefaultCodePage = Encoding.UTF8.CodePage;
+
+            Core.Logger.LogInfo($"DefaultCodePage : {ZipConstants.DefaultCodePage}");
+
             foreach (string zipPath in Directory.GetFiles(path, "*.zip", SearchOption.AllDirectories))
             {
                 ZipFile zip = new ZipFile(zipPath);
+#if debug
                 Core.Logger.LogInfo($"zip : {zipPath} , {zip.Count}");
-
+#endif
                 foreach (ZipEntry zfile in zip)
                 {
                     if (!zfile.IsFile) continue;
                                         
                     var fileName = Path.GetFileNameWithoutExtension(zfile.Name);
+#if debug
                     Core.Logger.LogInfo($"{fileName} , {zfile.Name} , {zfile.IsDirectory} , {zfile.IsFile}");//  , {zip.FindEntry(name, true)}
-
+#endif
                     fileZips[fileName] = zip;
                     fileEntrys[fileName] = zfile;
 
@@ -114,11 +120,13 @@ namespace i18nex.ZipLoader
 
         public Stream OpenTextureTranslation(string path)
         {
+            Core.Logger.LogInfo($"OpenTextureTranslation , {path} ");
             return null;
         }
 
         public Stream OpenUiTranslation(string path)
         {
+            Core.Logger.LogInfo($"OpenUiTranslation , {path} ");
             return null;
         }
 
