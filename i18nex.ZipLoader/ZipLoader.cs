@@ -31,8 +31,10 @@ namespace i18nex.ZipLoader
 
         internal readonly static Dictionary<string, ZipFile> ScriptZips = new Dictionary<string, ZipFile>();
         internal readonly static Dictionary<string, ZipEntry> ScriptEntrys = new Dictionary<string, ZipEntry>();
-        internal readonly static Dictionary<string, ZipFile> TextureZips = new Dictionary<string, ZipFile>();
-        internal readonly static Dictionary<string, ZipEntry> TextureEntrys = new Dictionary<string, ZipEntry>();
+        //internal readonly static Dictionary<string, ZipFile> TextureZips = new Dictionary<string, ZipFile>();
+        //internal readonly static Dictionary<string, ZipEntry> TextureEntrys = new Dictionary<string, ZipEntry>();
+        
+        internal readonly static List<ZipFile> zipFiles = new List<ZipFile>();
 
         /*
         public ZipLoader()
@@ -53,12 +55,19 @@ namespace i18nex.ZipLoader
             Core.Logger.LogInfo($"Loading language \"{CurrentLanguage}\"");
 
             ZipLoad("Script", ScriptZips,ScriptEntrys);
-            ZipLoad("Textures", TextureZips, TextureEntrys);
+            //ZipLoad("Textures", TextureZips, TextureEntrys);
         }
 
         public void UnloadCurrentTranslation()
         {
             Core.Logger.LogInfo($"Unloading language \"{CurrentLanguage}\"");
+
+            foreach (var zip in zipFiles)
+            {
+                zip.Close();
+            }
+            zipFiles.Clear();
+
             CurrentLanguage = null;
             langPath = null;
         }
@@ -80,7 +89,9 @@ namespace i18nex.ZipLoader
             foreach (string zipPath in Directory.GetFiles(path, "*.zip", SearchOption.AllDirectories))
             {
                 ZipFile zip = new ZipFile(zipPath);
-                Core.Logger.LogInfo($"zip : {zipPath} , {zip.Count}");
+                
+                zipFiles.Add(zip);
+                Core.Logger.LogInfo($"zip : {zipPath} , {zip.Count} , {zip.ZipFileComment}");
 #if Debug
 #endif
                 foreach (ZipEntry zfile in zip)
@@ -101,6 +112,8 @@ namespace i18nex.ZipLoader
                     zips[fileName] = zip;
                     entrys[fileName] = zfile;
                 }
+
+
             }
 
             Core.Logger.LogInfo($"ZipLoad : {type} , {zips.Count} , {entrys.Count}");
@@ -113,7 +126,11 @@ namespace i18nex.ZipLoader
 
         public IEnumerable<string> GetTextureTranslationFileNames()
         {
-            return TextureEntrys.Keys;//.Where(x => x.EndsWith(".png"));
+            var texPath = Path.Combine(langPath, "Textures");
+            if (!Directory.Exists(texPath))
+                return null;
+            return Directory.GetFiles(texPath, "*.png", SearchOption.AllDirectories);
+            //return TextureEntrys.Keys;//.Where(x => x.EndsWith(".png"));
         }
 
         public SortedDictionary<string, IEnumerable<string>> GetUITranslationFileNames()
@@ -135,6 +152,8 @@ namespace i18nex.ZipLoader
             return dict;
         }
 
+        static byte[] buffer = new byte[4096];
+
         private static Stream GetStream(string path, Dictionary<string, ZipFile> zips, Dictionary<string, ZipEntry> entrys)
         {
             Stream stream = null;
@@ -146,8 +165,12 @@ namespace i18nex.ZipLoader
                 {
                     return stream;
                 }
-                zfile = entrys[path];                
-                stream = zips[path].GetInputStream(zfile);                
+                
+                zfile = entrys[path];
+
+                stream = zips[path].GetInputStream(zfile);              
+                //stream = new MemoryStream();
+                //StreamUtils.Copy(zips[path].GetInputStream(zfile), stream, buffer);                                            
 
                 Core.Logger.LogInfo($"GetStream , {zfile?.Name} , {zfile?.Offset} , {zfile?.Size} , {zfile?.CompressedSize} , {zfile?.Crc} , {zfile?.ZipFileIndex} , {stream?.Length} ");//  , {zip.FindEntry(name, true)}
             }
@@ -164,22 +187,31 @@ namespace i18nex.ZipLoader
 
             Stream stream = GetStream(path, ScriptZips, ScriptEntrys);
             //using (FileStream fileStream = File.Create(Path.Combine(langPath, "Script\\" + path)))
-           // {
-            //    StreamUtils.Copy(stream, fileStream, new byte[4096]);
-           // }
+            //{
+            //    StreamUtils.Copy(stream, fileStream, buffer);
+            //}
+            //using (FileStream fileStream = File.Create(Path.Combine(langPath, "Script\\t_" + path)))
+            //{
+            //    StreamUtils.Copy(stream, fileStream, buffer);
+            //}
             return stream;
         }
 
         public Stream OpenTextureTranslation(string path)
         {
             Core.Logger.LogInfo($"OpenTextureTranslation , {path} ");
+            return !File.Exists(path) ? null : File.OpenRead(path);
 
-            Stream stream = GetStream(path, TextureZips, TextureEntrys);
+            //Stream stream = GetStream(path, TextureZips, TextureEntrys);
             //using (FileStream fileStream = File.Create(Path.Combine(langPath, "Textures\\"+path)))
             //{
-            //    StreamUtils.Copy(stream, fileStream, new byte[4096]);
+            //    StreamUtils.Copy(stream, fileStream, buffer);
             //}
-            return stream;
+            //using (FileStream fileStream = File.Create(Path.Combine(langPath, "Textures\\t_"+path)))
+            //{
+            //    StreamUtils.Copy(stream, fileStream, buffer);
+            //}
+            //return stream;
             //return null;
         }
 
