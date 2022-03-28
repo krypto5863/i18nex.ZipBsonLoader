@@ -58,8 +58,8 @@ namespace i18nex.ZipLoader
             dict.Clear();
             dictTmp.Clear();
 
-            ZipLoad("Script", Scripts, "*.txt");
-            ZipLoad("Textures", Textures, "*.png");
+            ZipLoad("Script", Scripts, ".txt");
+            ZipLoad("Textures", Textures, ".png");
             UIZipLoad("UI", UIs);
 
             FileLoad("Script", Scripts, "*.txt");
