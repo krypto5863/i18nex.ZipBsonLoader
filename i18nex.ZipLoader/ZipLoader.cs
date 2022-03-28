@@ -1,8 +1,11 @@
 ﻿//using BepInEx;
 //using BepInEx.Logging;
+using BepInEx.Configuration;
+using BepInEx.Logging;
 using COM3D2.i18nEx.Core;
 using COM3D2.i18nEx.Core.Loaders;
 using COM3D2.i18nEx.Core.Util;
+using HarmonyLib;
 using ICSharpCode.SharpZipLib.Core;
 using ICSharpCode.SharpZipLib.Zip;
 using System;
@@ -16,22 +19,33 @@ namespace i18nex.ZipLoader
 {
     public class ZipLoader : ITranslationLoader
     {
+        internal static ManualLogSource log = new ManualLogSource("ZipLoader");
+        internal static ConfigFile config_;
+        internal static ConfigEntry<bool> isLog;
 
         public string CurrentLanguage { get; private set; }
-        private static string langPath;
 
-        static byte[] buffer = new byte[4096];
+        private static string langPath;
 
         internal readonly static Dictionary<string, byte[]> Scripts = new Dictionary<string, byte[]>();
         internal readonly static Dictionary<string, byte[]> Textures = new Dictionary<string, byte[]>();
 
+        static byte[] buffer = new byte[4096];
 
 
         public void SelectLanguage(string name, string path, global::ExIni.IniFile config)
         {
+            Core.Logger.LogInfo($"Loading language \"{name}\"");
+
             CurrentLanguage = name;
             langPath = path;
-            Core.Logger.LogInfo($"Loading language \"{CurrentLanguage}\"");
+
+            var type =  AccessTools.TypeByName("COM3D2.i18nEx.Core.Paths");
+            var property =AccessTools.Property(type, "TranslationsRoot");
+            Core.Logger.LogInfo($"TranslationsRoot \"{(string)property.GetValue(null, null)}\"");
+
+            config_ = new ConfigFile(Path.Combine((string)property.GetValue(null, null), "ZipLoader.cfg"), true);
+            isLog = config_.Bind("Utill", "isLog", false);
 
             Scripts.Clear();
             Textures.Clear();
@@ -45,6 +59,7 @@ namespace i18nex.ZipLoader
         {
             Core.Logger.LogInfo($"Unloading language \"{CurrentLanguage}\"");
 
+            config_ = null;
             CurrentLanguage = null;
             langPath = null;
         }
@@ -56,7 +71,7 @@ namespace i18nex.ZipLoader
 
             string path = Path.Combine(langPath, type);
             if (!Directory.Exists(path))
-                return;           
+                return;
 
             foreach (string zipPath in Directory.GetFiles(path, "*.zip", SearchOption.AllDirectories))
             {
@@ -72,14 +87,7 @@ namespace i18nex.ZipLoader
                             Core.Logger.LogInfo($"Can't Decompress {zfile.Name}");
                             continue;
                         }
-                        using (Stream stream =zip.GetInputStream(zfile))
-                        using (MemoryStream mstream =new MemoryStream())
-                        {
-                            StreamUtils.Copy(stream, mstream, buffer);
-                            var fileName = Path.GetFileName(zfile.Name);
-                            dic[fileName] =mstream.ToArray();
-                            //Core.Logger.LogInfo($"ZipLoad : {fileName} , {dic[fileName].Length}");
-                        }                        
+                        DicAdd(dic, zip.GetInputStream(zfile), Path.GetFileName(zfile.Name));
                     }
                 }
             }
@@ -87,30 +95,37 @@ namespace i18nex.ZipLoader
             Core.Logger.LogInfo($"ZipLoad : {type} , {dic.Count}");
         }
 
-        public void FileLoad(string type, Dictionary<string, byte[]> dic,string searchPattern)
-        {            
+        public void FileLoad(string type, Dictionary<string, byte[]> dic, string searchPattern)
+        {
             Core.Logger.LogInfo($"FileLoad : {type}");
 
             string path = Path.Combine(langPath, type);
             if (!Directory.Exists(path))
                 return;
-                       
+
             foreach (string file in Directory.GetFiles(path, searchPattern, SearchOption.AllDirectories))
             {
-                using (Stream stream = File.OpenRead(file))
-                using (MemoryStream mstream = new MemoryStream())
-                {
-                    StreamUtils.Copy(stream, mstream, buffer);
-                    var fileName = Path.GetFileName(file);
-                    dic[fileName] = mstream.ToArray();
-                    //Core.Logger.LogInfo($"FileLoad : {fileName} , {dic[fileName].Length}");
-                }
+                DicAdd(dic, File.OpenRead(file), Path.GetFileName(file));
             }
             Core.Logger.LogInfo($"FileLoad : {type} , {dic.Count}");
         }
 
+        private static void DicAdd(Dictionary<string, byte[]> dic, Stream stream, string fileName)
+        {
+            using (stream)
+            using (MemoryStream mstream = new MemoryStream())
+            {
+                StreamUtils.Copy(stream, mstream, buffer);
+                dic[fileName] = mstream.ToArray();
+                if (isLog.Value)
+                {
+                    Core.Logger.LogInfo($"DicAdd : {fileName} , {dic[fileName].Length}");
+                }
+            }
+        }
+
         public IEnumerable<string> GetScriptTranslationFileNames()
-        {            
+        {
             return Scripts.Keys;
         }
 
@@ -138,28 +153,32 @@ namespace i18nex.ZipLoader
             return dict;
         }
 
-
         public Stream GetStream(string path, Dictionary<string, byte[]> dic)
-        {            
+        {
             return new MemoryStream(dic[path]);
         }
 
         public Stream OpenScriptTranslation(string path)
         {
-            Core.Logger.LogInfo($"OpenScriptTranslation , {path} ");
-                        
+            if (isLog.Value)
+                Core.Logger.LogInfo($"OpenScriptTranslation , {path} ");
+
             return GetStream(path, Scripts);
         }
 
         public Stream OpenTextureTranslation(string path)
         {
-            Core.Logger.LogInfo($"OpenTextureTranslation , {path} ");
+            if (isLog.Value)
+                Core.Logger.LogInfo($"OpenTextureTranslation , {path} ");
 
             return GetStream(path, Textures);
         }
 
         public Stream OpenUiTranslation(string path)
         {
+            if (isLog.Value)
+                Core.Logger.LogInfo($"OpenUiTranslation , {path} ");
+
             path = Utility.CombinePaths(langPath, "UI", path);
             return !File.Exists(path) ? null : File.OpenRead(path);
         }
