@@ -21,7 +21,8 @@ namespace i18nex.ZipLoader
     {
         internal static ManualLogSource log = new ManualLogSource("ZipLoader");
         internal static ConfigFile config_;
-        internal static ConfigEntry<bool> isLog;
+        internal static ConfigEntry<bool> isLogLaod;
+        internal static ConfigEntry<bool> isTranslation;
 
         public string CurrentLanguage { get; private set; }
 
@@ -29,6 +30,9 @@ namespace i18nex.ZipLoader
 
         internal readonly static Dictionary<string, byte[]> Scripts = new Dictionary<string, byte[]>();
         internal readonly static Dictionary<string, byte[]> Textures = new Dictionary<string, byte[]>();
+        internal readonly static Dictionary<string, byte[]> UIs = new Dictionary<string, byte[]>();
+        internal readonly static SortedDictionary<string, HashSet<string>> dictTmp = new SortedDictionary<string, HashSet<string>>(StringComparer.InvariantCultureIgnoreCase);
+        internal readonly static SortedDictionary<string, IEnumerable<string>> dict = new SortedDictionary<string, IEnumerable<string>>(StringComparer.InvariantCultureIgnoreCase);
 
         static byte[] buffer = new byte[4096];
 
@@ -40,26 +44,38 @@ namespace i18nex.ZipLoader
             CurrentLanguage = name;
             langPath = path;
 
-            var type =  AccessTools.TypeByName("COM3D2.i18nEx.Core.Paths");
-            var property =AccessTools.Property(type, "TranslationsRoot");
+            var type = AccessTools.TypeByName("COM3D2.i18nEx.Core.Paths");
+            var property = AccessTools.Property(type, "TranslationsRoot");
             Core.Logger.LogInfo($"TranslationsRoot \"{(string)property.GetValue(null, null)}\"");
 
             config_ = new ConfigFile(Path.Combine((string)property.GetValue(null, null), "ZipLoader.cfg"), true);
-            isLog = config_.Bind("Utill", "isLog", false);
+            isLogLaod = config_.Bind("isLog", "isLogLaod", false);
+            isTranslation = config_.Bind("isLog", "isTranslation", false);
 
             Scripts.Clear();
             Textures.Clear();
+            UIs.Clear();
+            dict.Clear();
+            dictTmp.Clear();
+
             ZipLoad("Script", Scripts);
             ZipLoad("Textures", Textures);
+            UIZipLoad();
+
             FileLoad("Script", Scripts, "*.txt");
             FileLoad("Textures", Textures, "*.png");
+            UILoad();
+
+            UIdictSet();
         }
+
 
         public void UnloadCurrentTranslation()
         {
             Core.Logger.LogInfo($"Unloading language \"{CurrentLanguage}\"");
 
             config_ = null;
+            isLogLaod = null;
             CurrentLanguage = null;
             langPath = null;
         }
@@ -110,6 +126,62 @@ namespace i18nex.ZipLoader
             Core.Logger.LogInfo($"FileLoad : {type} , {dic.Count}");
         }
 
+        public void UIZipLoad()
+        {
+
+        }
+
+        public void UILoad()
+        {
+            var uiPath = Path.Combine(langPath, "UI");
+            if (!Directory.Exists(uiPath))
+                return;
+
+            foreach (var directory in Directory.GetDirectories(uiPath, "*", SearchOption.TopDirectoryOnly))
+            {
+                // Item
+                //var dirName = directory.Splice(uiPath.Length, -1).Trim('\\', '/');
+                var dirName = Path.GetFileName(directory);
+                if (isLogLaod.Value)
+                    Core.Logger.LogInfo($"GetUITranslationFileNames , {dirName} ");
+
+                //IEnumerable<string> value = Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories).Select(s => s.Splice(directory.Length + 1, -1));
+                var files = Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories);
+                // H:\COM3D2_5-test\i18nEx\korean\UI\Item\accanl.csv  
+                if (isLogLaod.Value)
+                    if (files.Length > 0)
+                    {
+                        Core.Logger.LogInfo($"GetUITranslationFileNames , { files[0].Splice(directory.Length + 1, -1)}  , { files[0]}  ");
+                    }
+
+                if (!dictTmp.ContainsKey(dirName))
+                {
+                    dictTmp[dirName] = new HashSet<string>();
+                }
+
+                foreach (var file in files)
+                {
+                    var name = Path.GetFileName(file);
+                    DicAdd(UIs, File.OpenRead(file), dirName + "\\" + name);
+                    dictTmp[dirName].Add(name);
+                }
+
+                //UIs.Add(dirName, );
+                //dict.Add(dirName, value.Select(s => s.Splice(directory.Length + 1, -1)).ToList());
+
+                //Core.Logger.LogInfo($"UILoad : {directory} , {UIs[dirName].Count}");
+            }
+            Core.Logger.LogInfo($"UILoad : {UIs.Count}");
+        }
+
+        public void UIdictSet()
+        {
+            foreach (var item in dictTmp)
+            {
+                dict[item.Key] = item.Value;
+            }
+        }
+
         private static void DicAdd(Dictionary<string, byte[]> dic, Stream stream, string fileName)
         {
             using (stream)
@@ -117,7 +189,7 @@ namespace i18nex.ZipLoader
             {
                 StreamUtils.Copy(stream, mstream, buffer);
                 dic[fileName] = mstream.ToArray();
-                if (isLog.Value)
+                if (isLogLaod.Value)
                 {
                     Core.Logger.LogInfo($"DicAdd : {fileName} , {dic[fileName].Length}");
                 }
@@ -136,20 +208,6 @@ namespace i18nex.ZipLoader
 
         public SortedDictionary<string, IEnumerable<string>> GetUITranslationFileNames()
         {
-            var uiPath = Path.Combine(langPath, "UI");
-            if (!Directory.Exists(uiPath))
-                return null;
-
-            var dict = new SortedDictionary<string, IEnumerable<string>>(StringComparer.InvariantCultureIgnoreCase);
-
-            foreach (var directory in Directory.GetDirectories(uiPath, "*", SearchOption.TopDirectoryOnly))
-            {
-                var dirName = directory.Splice(uiPath.Length, -1).Trim('\\', '/');
-                dict.Add(dirName,
-                         Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories)
-                                  .Select(s => s.Splice(directory.Length + 1, -1)));
-            }
-
             return dict;
         }
 
@@ -160,7 +218,7 @@ namespace i18nex.ZipLoader
 
         public Stream OpenScriptTranslation(string path)
         {
-            if (isLog.Value)
+            if (isTranslation.Value)
                 Core.Logger.LogInfo($"OpenScriptTranslation , {path} ");
 
             return GetStream(path, Scripts);
@@ -168,19 +226,22 @@ namespace i18nex.ZipLoader
 
         public Stream OpenTextureTranslation(string path)
         {
-            if (isLog.Value)
+            if (isTranslation.Value)
                 Core.Logger.LogInfo($"OpenTextureTranslation , {path} ");
 
             return GetStream(path, Textures);
         }
 
+        // Dance\SceneDance_1OY_Release.csv 
         public Stream OpenUiTranslation(string path)
         {
-            if (isLog.Value)
+            if (isTranslation.Value)
                 Core.Logger.LogInfo($"OpenUiTranslation , {path} ");
 
-            path = Utility.CombinePaths(langPath, "UI", path);
-            return !File.Exists(path) ? null : File.OpenRead(path);
+            return GetStream(path, UIs);
+
+            //path = Utility.CombinePaths(langPath, "UI", path);
+            //return !File.Exists(path) ? null : File.OpenRead(path);
         }
 
     }
