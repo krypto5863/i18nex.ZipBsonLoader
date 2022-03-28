@@ -8,7 +8,7 @@ Script zip support
 Script txt support  
 Textures zip support  
 Textures png support  
-__UI zip not support__  
+UI zip support (Read UI zip, csv Manual)
 UI csv support  
 
 
