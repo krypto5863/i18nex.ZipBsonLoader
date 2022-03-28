@@ -58,9 +58,9 @@ namespace i18nex.ZipLoader
             dict.Clear();
             dictTmp.Clear();
 
-            ZipLoad("Script", Scripts);
-            ZipLoad("Textures", Textures);
-            UIZipLoad();
+            ZipLoad("Script", Scripts, "*.txt");
+            ZipLoad("Textures", Textures, "*.png");
+            UIZipLoad("UI", UIs);
 
             FileLoad("Script", Scripts, "*.txt");
             FileLoad("Textures", Textures, "*.png");
@@ -80,7 +80,7 @@ namespace i18nex.ZipLoader
             langPath = null;
         }
 
-        public void ZipLoad(string type, Dictionary<string, byte[]> dic)
+        public void ZipLoad(string type, Dictionary<string, byte[]> dic, string searchPattern)
         {
             ZipConstants.DefaultCodePage = Encoding.UTF8.CodePage;
             Core.Logger.LogInfo($"ZipLoad : {type} {ZipConstants.DefaultCodePage}");
@@ -103,7 +103,12 @@ namespace i18nex.ZipLoader
                             Core.Logger.LogInfo($"Can't Decompress {zfile.Name}");
                             continue;
                         }
-                        DicAdd(dic, zip.GetInputStream(zfile), Path.GetFileName(zfile.Name));
+                        var name = Path.GetFileName(zfile.Name);
+                        if (!name.EndsWith(searchPattern))
+                        {
+                            continue;
+                        }
+                        DicAdd(dic, zip.GetInputStream(zfile), name);
                     }
                 }
             }
@@ -126,10 +131,66 @@ namespace i18nex.ZipLoader
             Core.Logger.LogInfo($"FileLoad : {type} , {dic.Count}");
         }
 
-        public void UIZipLoad()
+        public void UIZipLoad(string type, Dictionary<string, byte[]> dic)
         {
+            ZipConstants.DefaultCodePage = Encoding.UTF8.CodePage;
+            Core.Logger.LogInfo($"ZipLoad : {type} {ZipConstants.DefaultCodePage}");
 
+            string path = Path.Combine(langPath, type);
+            if (!Directory.Exists(path))
+                return;
+
+            foreach (string zipPath in Directory.GetFiles(path, "*.zip", SearchOption.AllDirectories))
+            {
+                using (ZipFile zip = new ZipFile(zipPath))
+                {
+                    Core.Logger.LogInfo($"zip : {zip.Name} , {zipPath} , {zip.Count} , {zip.ZipFileComment}");
+
+                    string dirName = Path.GetFileNameWithoutExtension(zip.Name);
+
+                    dictTmpChk(dirName);
+                    if (isLogLaod.Value)
+                        Core.Logger.LogInfo($"UILoad , {dirName} ");
+
+                    foreach (ZipEntry zfile in zip)
+                    {                                              
+                        if (zfile.IsDirectory)
+                        {
+                            dirName= zfile.Name.Split('/')[0];
+                            if (isLogLaod.Value)
+                                Core.Logger.LogInfo($"IsDirectory , {dirName} {zfile.Name}");
+                            dictTmpChk(dirName);
+                        }
+
+                        if (zfile.IsFile)
+                        {
+                            var name = Path.GetFileName(zfile.Name);
+                            if (!zfile.CanDecompress )
+                            {
+                                Core.Logger.LogInfo($"Can't Decompress {zfile.Name}");
+                                continue;
+                            }                            
+                            if (!name.EndsWith(".csv"))
+                            {
+                                continue;
+                            }
+
+                            if (isLogLaod.Value)
+                                Core.Logger.LogInfo($"IsFile : {name} , {zfile.Name}");
+                            DicAdd(UIs, zip.GetInputStream(zfile), dirName + "\\" + name);
+                            dictTmp[dirName].Add(name);
+                        }
+
+                    }
+
+
+                }
+            }
+
+            Core.Logger.LogInfo($"ZipLoad : {type} , {dic.Count}");
         }
+
+
 
         public void UILoad()
         {
@@ -143,7 +204,7 @@ namespace i18nex.ZipLoader
                 //var dirName = directory.Splice(uiPath.Length, -1).Trim('\\', '/');
                 var dirName = Path.GetFileName(directory);
                 if (isLogLaod.Value)
-                    Core.Logger.LogInfo($"GetUITranslationFileNames , {dirName} ");
+                    Core.Logger.LogInfo($"UILoad , {dirName} ");
 
                 //IEnumerable<string> value = Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories).Select(s => s.Splice(directory.Length + 1, -1));
                 var files = Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories);
@@ -151,13 +212,10 @@ namespace i18nex.ZipLoader
                 if (isLogLaod.Value)
                     if (files.Length > 0)
                     {
-                        Core.Logger.LogInfo($"GetUITranslationFileNames , { files[0].Splice(directory.Length + 1, -1)}  , { files[0]}  ");
+                        Core.Logger.LogInfo($"UILoad , { files[0].Splice(directory.Length + 1, -1)}  , { files[0]}  ");
                     }
 
-                if (!dictTmp.ContainsKey(dirName))
-                {
-                    dictTmp[dirName] = new HashSet<string>();
-                }
+                dictTmpChk(dirName);
 
                 foreach (var file in files)
                 {
@@ -178,7 +236,19 @@ namespace i18nex.ZipLoader
         {
             foreach (var item in dictTmp)
             {
+                if (item.Value.Count==0)
+                {
+                    continue;
+                }
                 dict[item.Key] = item.Value;
+            }
+        }
+
+        private static void dictTmpChk(string dirName)
+        {
+            if (!dictTmp.ContainsKey(dirName))
+            {
+                dictTmp[dirName] = new HashSet<string>();
             }
         }
 
