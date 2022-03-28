@@ -51,4 +51,4 @@ COM3D2\i18nEx\{lang}\Script\{type}\*.csv (sub Directory include)
 
 # ghorsington's comment
 
- The way i18nEx handles translation loaders right now is that your custom one will replace the default loader. So basically right now not providing texture loading means textures won't be replaced
+ The way i18nEx handles translation loaders right now is that your custom one will replace the default loader.
