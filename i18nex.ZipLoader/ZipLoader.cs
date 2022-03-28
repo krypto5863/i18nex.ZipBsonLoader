@@ -69,7 +69,6 @@ namespace i18nex.ZipLoader
             UIdictSet();
         }
 
-
         public void UnloadCurrentTranslation()
         {
             Core.Logger.LogInfo($"Unloading language \"{CurrentLanguage}\"");
@@ -134,7 +133,7 @@ namespace i18nex.ZipLoader
         public void UIZipLoad(string type, Dictionary<string, byte[]> dic)
         {
             ZipConstants.DefaultCodePage = Encoding.UTF8.CodePage;
-            Core.Logger.LogInfo($"ZipLoad : {type} {ZipConstants.DefaultCodePage}");
+            Core.Logger.LogInfo($"UIZipLoad : {type} {ZipConstants.DefaultCodePage}");
 
             string path = Path.Combine(langPath, type);
             if (!Directory.Exists(path))
@@ -147,18 +146,13 @@ namespace i18nex.ZipLoader
                     Core.Logger.LogInfo($"zip : {zip.Name} , {zipPath} , {zip.Count} , {zip.ZipFileComment}");
 
                     string dirName = Path.GetFileNameWithoutExtension(zip.Name);
-
                     dictTmpChk(dirName);
-                    if (isLogLaod.Value)
-                        Core.Logger.LogInfo($"UILoad , {dirName} ");
 
                     foreach (ZipEntry zfile in zip)
                     {                                              
                         if (zfile.IsDirectory)
                         {
                             dirName= zfile.Name.Split('/')[0];
-                            if (isLogLaod.Value)
-                                Core.Logger.LogInfo($"IsDirectory , {dirName} {zfile.Name}");
                             dictTmpChk(dirName);
                         }
 
@@ -175,22 +169,15 @@ namespace i18nex.ZipLoader
                                 continue;
                             }
 
-                            if (isLogLaod.Value)
-                                Core.Logger.LogInfo($"IsFile : {name} , {zfile.Name}");
                             DicAdd(UIs, zip.GetInputStream(zfile), dirName + "\\" + name);
                             dictTmp[dirName].Add(name);
                         }
-
                     }
-
-
                 }
             }
 
-            Core.Logger.LogInfo($"ZipLoad : {type} , {dic.Count}");
+            Core.Logger.LogInfo($"UIZipLoad : {type} , {dic.Count}");
         }
-
-
 
         public void UILoad()
         {
@@ -200,15 +187,12 @@ namespace i18nex.ZipLoader
 
             foreach (var directory in Directory.GetDirectories(uiPath, "*", SearchOption.TopDirectoryOnly))
             {
-                // Item
-                //var dirName = directory.Splice(uiPath.Length, -1).Trim('\\', '/');
                 var dirName = Path.GetFileName(directory);
                 if (isLogLaod.Value)
                     Core.Logger.LogInfo($"UILoad , {dirName} ");
 
-                //IEnumerable<string> value = Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories).Select(s => s.Splice(directory.Length + 1, -1));
-                var files = Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories);
-                // H:\COM3D2_5-test\i18nEx\korean\UI\Item\accanl.csv  
+               var files = Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories);
+
                 if (isLogLaod.Value)
                     if (files.Length > 0)
                     {
@@ -223,11 +207,6 @@ namespace i18nex.ZipLoader
                     DicAdd(UIs, File.OpenRead(file), dirName + "\\" + name);
                     dictTmp[dirName].Add(name);
                 }
-
-                //UIs.Add(dirName, );
-                //dict.Add(dirName, value.Select(s => s.Splice(directory.Length + 1, -1)).ToList());
-
-                //Core.Logger.LogInfo($"UILoad : {directory} , {UIs[dirName].Count}");
             }
             Core.Logger.LogInfo($"UILoad : {UIs.Count}");
         }
@@ -246,6 +225,8 @@ namespace i18nex.ZipLoader
 
         private static void dictTmpChk(string dirName)
         {
+            if (isLogLaod.Value)
+                Core.Logger.LogInfo($"dictTmpChk , {dirName}");
             if (!dictTmp.ContainsKey(dirName))
             {
                 dictTmp[dirName] = new HashSet<string>();
@@ -259,10 +240,8 @@ namespace i18nex.ZipLoader
             {
                 StreamUtils.Copy(stream, mstream, buffer);
                 dic[fileName] = mstream.ToArray();
-                if (isLogLaod.Value)
-                {
-                    Core.Logger.LogInfo($"DicAdd : {fileName} , {dic[fileName].Length}");
-                }
+                if (isLogLaod.Value)                
+                    Core.Logger.LogInfo($"DicAdd : {fileName} , {dic[fileName].Length}");                
             }
         }
 
@@ -309,9 +288,6 @@ namespace i18nex.ZipLoader
                 Core.Logger.LogInfo($"OpenUiTranslation , {path} ");
 
             return GetStream(path, UIs);
-
-            //path = Utility.CombinePaths(langPath, "UI", path);
-            //return !File.Exists(path) ? null : File.OpenRead(path);
         }
 
     }
