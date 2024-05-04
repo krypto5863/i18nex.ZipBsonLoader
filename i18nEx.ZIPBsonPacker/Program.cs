@@ -1,5 +1,4 @@
-﻿using System.IO.Compression;
-using System.Text;
+﻿using System.Text;
 using Newtonsoft.Json.Bson;
 using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 
@@ -48,20 +47,15 @@ namespace i18nEx.ZipBsonPacker
 			}
 
 			var bsonFile = Path.GetFileName(targetDir) + ".bson";
-			var outputPath = Path.Combine(Path.GetDirectoryName(targetDir), bsonFile + ".zip");
+			var outputPath = Path.Combine(Path.GetDirectoryName(targetDir), bsonFile);
 
-			using var fileStream = new FileStream(outputPath, FileMode.Create);
-			using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Create, true))
+			using (var bsonFileStream = new FileStream(outputPath, FileMode.CreateNew))
+			using (var writer = new BsonDataWriter(bsonFileStream))
 			{
-				var bsonFileEntry = archive.CreateEntry(bsonFile);
-
-				using (var entryStream = bsonFileEntry.Open())
-				using (var writer = new BsonDataWriter(entryStream))
-				{
-					var serializer = new JsonSerializer();
-					serializer.Serialize(writer, filesDictionary);
-				}
+				var serializer = new JsonSerializer();
+				serializer.Serialize(writer, filesDictionary);
 			}
+
 
 			Console.WriteLine($"Done, saved file to {outputPath}");
 		}
