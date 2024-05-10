@@ -1,15 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Text;
-using BepInEx.Logging;
+﻿using BepInEx.Logging;
 using COM3D2.i18nEx.Core.Loaders;
 using ExIni;
+using HarmonyLib;
 using ICSharpCode.SharpZipLib.Zip;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Bson;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
 
 namespace i18nex.ZipBsonLoader
 {
@@ -21,12 +21,11 @@ namespace i18nex.ZipBsonLoader
 
 		private static string _langPath;
 
-		internal static readonly Dictionary<string, ITranslationAsset> Scripts = new Dictionary<string, ITranslationAsset>();
-		internal static readonly Dictionary<string, ITranslationAsset> Textures = new Dictionary<string, ITranslationAsset>();
-		internal static readonly Dictionary<string, ITranslationAsset> UIs = new Dictionary<string, ITranslationAsset>();
+		internal static Dictionary<string, ITranslationAsset> Scripts = new Dictionary<string, ITranslationAsset>();
+		internal static Dictionary<string, ITranslationAsset> Textures = new Dictionary<string, ITranslationAsset>();
+		internal static Dictionary<string, ITranslationAsset> UIs = new Dictionary<string, ITranslationAsset>();
 
-		internal static readonly SortedDictionary<string, HashSet<string>> TemporaryUiDirectoryTree = new SortedDictionary<string, HashSet<string>>(StringComparer.InvariantCultureIgnoreCase);
-		internal static readonly SortedDictionary<string, IEnumerable<string>> UiDirectoryTree = new SortedDictionary<string, IEnumerable<string>>(StringComparer.InvariantCultureIgnoreCase);
+		internal static SortedDictionary<string, IEnumerable<string>> UiDirectoryTree = new SortedDictionary<string, IEnumerable<string>>(StringComparer.InvariantCultureIgnoreCase);
 
 		public void SelectLanguage(string name, string path, IniFile config)
 		{
@@ -35,32 +34,15 @@ namespace i18nex.ZipBsonLoader
 			CurrentLanguage = name;
 			_langPath = path;
 
-			Scripts.Clear();
-			Textures.Clear();
-			UIs.Clear();
-			UiDirectoryTree.Clear();
-			TemporaryUiDirectoryTree.Clear();
-
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 
-			ZipLoad("Script", Scripts, ".txt");
-			Logger.LogInfo($"Scripts ZIP done loading @ {stopwatch.Elapsed}");
-
-			ZipLoad("UI", UIs, ".csv");
-			Logger.LogInfo($"UI ZIP done loading @ {stopwatch.Elapsed}");
-
-			Logger.LogInfo($"Done loading all ZIP files @ {stopwatch.Elapsed}");
-
-			TemporaryUiDirectoryTree[string.Empty] = new HashSet<string>(UIs.Keys.Select(r => r.Replace("\\", string.Empty)));
-
-			FileLoad("Script", Scripts, "*.txt");
-			FileLoad("Textures", Textures, "*.png");
-			UiLoad();
+			Textures = TexturesLoad();
+			UIs = UiLoad(out var directoryTree);
+			Scripts = ScriptLoad();
+			UiDirectoryTree = directoryTree;
 
 			Logger.LogInfo($"Done loading everything @ {stopwatch.Elapsed}");
-
-			CommitTemporaryDirectoryDictionary();
 		}
 
 		public void UnloadCurrentTranslation()
@@ -70,17 +52,38 @@ namespace i18nex.ZipBsonLoader
 			_langPath = null;
 		}
 
-		[Obsolete("Obsolete")]
-		public void ZipLoad(string type, Dictionary<string, ITranslationAsset> targetDictionary, string searchPattern)
+		public Dictionary<string, ITranslationAsset> GetLooseTranslationFiles(string type, string searchPattern)
+		{
+			var path = Path.Combine(_langPath, type);
+
+			if (!Directory.Exists(path))
+			{
+				return null;
+			}
+
+			var result = new Dictionary<string, ITranslationAsset>();
+
+			foreach (var file in Directory.GetFiles(path, searchPattern, SearchOption.AllDirectories))
+			{
+				result[file] = new LooseFileAsset(file);
+			}
+
+			return result;
+		}
+
+		public Dictionary<string, byte[]> LoadZipFiles(string type)
 		{
 			ZipConstants.DefaultCodePage = Encoding.UTF8.CodePage;
 
 			var path = Path.Combine(_langPath, type);
+
 			if (!Directory.Exists(path))
 			{
-				Logger.LogInfo("Directory not found. Nothing will be loaded...");
-				return;
+				Logger.LogInfo($"{path} not found. Nothing will be loaded...");
+				return null;
 			}
+
+			var completeDictionary = new Dictionary<string, byte[]>();
 
 			foreach (var zipPath in Directory.GetFiles(path, "*.zip", SearchOption.AllDirectories))
 			{
@@ -108,142 +111,102 @@ namespace i18nex.ZipBsonLoader
 
 							foreach (var file in dictionary)
 							{
-								if (!file.Key.EndsWith(searchPattern))
+								if (completeDictionary.ContainsKey(file.Key) == false)
 								{
-									continue;
+									completeDictionary[file.Key] = file.Value;
 								}
-
-								AddToMainDictionary(targetDictionary, new PackagedAsset(file.Value), "\\"+file.Key);
 							}
 						}
 					}
 				}
 			}
+
+			return completeDictionary;
 		}
 
-		public void FileLoad(string type, Dictionary<string, ITranslationAsset> targetDictionary, string searchPattern)
+		public Dictionary<string, ITranslationAsset> TexturesLoad()
 		{
-			var path = Path.Combine(_langPath, type);
-
-			if (!Directory.Exists(path))
-			{
-				return;
-			}
-
-			foreach (var file in Directory.GetFiles(path, searchPattern, SearchOption.AllDirectories))
-			{
-				AddToMainDictionary(targetDictionary, new LooseFileAsset(file), Path.GetFileName(file));
-			}
+			const string searchPattern = "*.png";
+			return GetLooseTranslationFiles("Textures", searchPattern);
 		}
 
-		/*
-		public void UiZipLoad(string type, Dictionary<string, ITranslationAsset> dic)
+		public Dictionary<string, ITranslationAsset> ScriptLoad()
 		{
-			ZipConstants.DefaultCodePage = Encoding.UTF8.CodePage;
-			Logger.LogInfo($"UIZipLoad : {type} {ZipConstants.DefaultCodePage}");
+			const string searchPattern = "*.txt";
+			var scriptFiles = GetLooseTranslationFiles("Script", searchPattern);
+			var packedScriptFiles = LoadZipFiles("Script");
 
-			var path = Path.Combine(_langPath, type);
+			var resultDictionary = new Dictionary<string, ITranslationAsset>();
 
-			if (!Directory.Exists(path))
+			foreach (var scriptFile in scriptFiles)
 			{
-				return;
-			}
-
-			foreach (var zipPath in Directory.GetFiles(path, "*.zip", SearchOption.AllDirectories))
-			{
-				using (var zip = new ZipFile(zipPath))
-				{
-					Logger.LogInfo($"zip : {zip.Name} , {zipPath} , {zip.Count} , {zip.ZipFileComment}");
-
-					var dirName = Path.GetFileNameWithoutExtension(zip.Name);
-					AddDirectoryToTemporaryDictionary(dirName);
-
-					foreach (ZipEntry zipFile in zip)
-					{
-						if (zipFile.IsDirectory)
-						{
-							dirName = zipFile.Name.Split('/')[0];
-							AddDirectoryToTemporaryDictionary(dirName);
-						}
-
-						if (!zipFile.IsFile)
-						{
-							continue;
-						}
-
-						var name = Path.GetFileName(zipFile.Name);
-						if (!zipFile.CanDecompress)
-						{
-							Logger.LogInfo($"Can't Decompress {zipFile.Name}");
-							continue;
-						}
-
-						if (!name.EndsWith(".csv"))
-						{
-							continue;
-						}
-
-						AddToMainDictionary(UIs, zip.GetInputStream(zipFile), dirName + "\\" + name);
-						TemporaryUiDirectoryTree[dirName].Add(name);
-					}
-				}
-			}
-
-			Logger.LogInfo($"UIZipLoad : {type} , {dic.Count}");
-		}
-		*/
-
-		public void UiLoad()
-		{
-			var uiPath = Path.Combine(_langPath, "UI");
-			if (!Directory.Exists(uiPath))
-			{
-				return;
-			}
-
-			foreach (var directory in Directory.GetDirectories(uiPath, "*", SearchOption.TopDirectoryOnly))
-			{
-				var dirName = Path.GetFileName(directory);
-
-				var files = Directory.GetFiles(directory, "*.csv", SearchOption.AllDirectories);
-
-				AddDirectoryToTemporaryDictionary(dirName);
-
-				foreach (var file in files)
-				{
-					var name = Path.GetFileName(file);
-					AddToMainDictionary(UIs, new LooseFileAsset(file), dirName + "\\" + name);
-					TemporaryUiDirectoryTree[dirName].Add(name);
-				}
-			}
-		}
-
-		public void CommitTemporaryDirectoryDictionary()
-		{
-			foreach (var item in TemporaryUiDirectoryTree)
-			{
-				if (item.Value.Count == 0)
+				var fileName = Path.GetFileName(scriptFile.Key);
+				if (resultDictionary.ContainsKey(fileName))
 				{
 					continue;
 				}
 
-				UiDirectoryTree[item.Key] = item.Value;
+				resultDictionary[fileName] = scriptFile.Value;
 			}
 
-			TemporaryUiDirectoryTree.Clear();
-		}
-
-		private static void AddDirectoryToTemporaryDictionary(string dirName)
-		{
-			if (!TemporaryUiDirectoryTree.ContainsKey(dirName))
+			foreach (var scriptFile in packedScriptFiles)
 			{
-				TemporaryUiDirectoryTree[dirName] = new HashSet<string>();
+				var fileName = Path.GetFileName(scriptFile.Key);
+				if (resultDictionary.ContainsKey(fileName))
+				{
+					continue;
+				}
+				resultDictionary[fileName] = new PackagedAsset(scriptFile.Value);
 			}
+
+			return resultDictionary;
 		}
 
-		private static void AddToMainDictionary(IDictionary<string, ITranslationAsset> targetDictionary, ITranslationAsset translationAsset, string fileName)
+		public Dictionary<string, ITranslationAsset> UiLoad(out SortedDictionary<string, IEnumerable<string>> directoryTree)
 		{
-			targetDictionary[fileName] = translationAsset;
+			const string searchPattern = "*.csv";
+			var looseCsvFiles = GetLooseTranslationFiles("UI", searchPattern);
+			var uiFiles = LoadZipFiles("UI");
+
+			var resultDictionary = new Dictionary<string, ITranslationAsset>();
+			directoryTree = new SortedDictionary<string, IEnumerable<string>>();
+
+			var path = Path.Combine(_langPath, "UI");
+
+			foreach (var csvFile in looseCsvFiles)
+			{
+				var parentPath = Path.GetDirectoryName(csvFile.Key) ?? string.Empty;
+				var fileName = Path.GetFileName(csvFile.Key);
+
+				if (directoryTree.TryGetValue(parentPath, out var ieEnumerable) == false)
+				{
+					directoryTree[parentPath] = new List<string>();
+					ieEnumerable = directoryTree[parentPath];
+				}
+
+				ieEnumerable.AddItem(fileName);
+				resultDictionary[csvFile.Key] = csvFile.Value;
+			}
+
+			foreach (var csvFile in uiFiles)
+			{
+				const string packageGhostFolder = "zzzzPackagedCsvFiles";
+				var relativeParentPath = Path.Combine(Path.GetDirectoryName(csvFile.Key) ?? string.Empty, packageGhostFolder);
+				var fullParentPath = Path.Combine(path, relativeParentPath);
+				var fileName = Path.GetFileName(csvFile.Key);
+
+				if (directoryTree.TryGetValue(fullParentPath, out var ieEnumerable) == false)
+				{
+					directoryTree[fullParentPath] = new List<string>();
+					ieEnumerable = directoryTree[fullParentPath];
+				}
+
+				ieEnumerable.AddItem(fileName);
+				var newFullPath = Path.Combine(path, Path.GetFileName(csvFile.Key));
+				resultDictionary[newFullPath] = new PackagedAsset(csvFile.Value);
+			}
+
+			return resultDictionary;
 		}
 
 		public IEnumerable<string> GetScriptTranslationFileNames()

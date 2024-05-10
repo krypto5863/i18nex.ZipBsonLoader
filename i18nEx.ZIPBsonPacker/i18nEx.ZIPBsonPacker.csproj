@@ -4,12 +4,12 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
 	  <ImplicitUsings>enable</ImplicitUsings>
-	  <UseWindowsForms>true</UseWindowsForms>
-    <Nullable>enable</Nullable>
+	  <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.3-beta1" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="System.IO.Abstractions" Version="21.0.2" />
   </ItemGroup>
 

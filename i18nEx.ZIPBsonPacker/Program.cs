@@ -1,53 +1,92 @@
-﻿using System.Text;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Bson;
-using JsonSerializer = Newtonsoft.Json.JsonSerializer;
+using System.CommandLine;
+using System.Diagnostics;
+using System.Text;
 
 namespace i18nEx.ZipBsonPacker
 {
-	
 	internal class Program
 	{
-
-		private static readonly FolderBrowserDialog FolderDialog = new();
-
-		[STAThread]
-		static void Main(string[] args)
+		private static async Task<int> Main(string[] args)
 		{
-			var folderDialogResult = FolderDialog.ShowDialog();
+			using (var p = Process.GetCurrentProcess())
+				p.PriorityClass = ProcessPriorityClass.BelowNormal;
 
-			while (folderDialogResult != DialogResult.OK)
-			{
-				folderDialogResult = FolderDialog.ShowDialog();
-			}
+			var rootCommand = new RootCommand("A simple CLI tool to un/pack Bson files for usage with the ZipBsonLoader");
 
-			var filesDictionary = new Dictionary<string, byte[]>();
-			var targetDir = FolderDialog.SelectedPath;
+			var packCommand = new Command(
+				name: "pack",
+				description: "The directory which contains your Tex files.");
 
-			foreach (var file in Directory.EnumerateFiles(targetDir, "*", SearchOption.AllDirectories))
-			{
-				var fileName = Path.GetFileName(file);
-				var textContent = File.ReadAllText(file).Trim();
+			rootCommand.AddCommand(packCommand);
 
-				Console.WriteLine($"Reading {fileName}...");
-
-				if (filesDictionary.ContainsKey(fileName))
+			var directoryOption =
+				new Option<DirectoryInfo>(aliases: new[] { "--directory", "-d" },
+					description: "Directory to be packed.")
 				{
-					if (fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+					IsRequired = true
+				};
+
+			var doCompressionOption =
+				new Option<bool>(
+					aliases: new[] { "--compress", "-c" },
+					description: "Compress the Bson to a zip file. Not suggested.");
+
+			var outputPathOption =
+				new Option<string>(aliases: new[] { "--output", "-o" }, "The full path to output the file, including the file name.")
+				{
+					IsRequired = true
+				};
+
+			packCommand.AddOption(directoryOption);
+			packCommand.AddOption(doCompressionOption);
+			packCommand.AddOption(outputPathOption);
+
+			packCommand.SetHandler((directory, compression, outputName) =>
+			{
+				PackBsonFile(directory, outputName, compression);
+			},
+			directoryOption, doCompressionOption, outputPathOption);
+
+			return await rootCommand.InvokeAsync(args);
+		}
+
+		private static void PackBsonFile(DirectoryInfo directory, string outputName, bool compression = false)
+		{
+			var filesDictionary = new Dictionary<string, byte[]>();
+			var filesInDir = directory.EnumerateFiles("*", SearchOption.AllDirectories)
+				.ToArray();
+
+			var counter = 0;
+			foreach (var file in filesInDir)
+			{
+				var relativeName = Path.GetRelativePath(directory.FullName, file.FullName);
+				var textContent = File.ReadAllText(file.FullName).Trim();
+
+				Console.WriteLine($"Reading {++counter}/{filesInDir.Length}: {relativeName}...");
+
+				if (filesDictionary.ContainsKey(relativeName))
+				{
+					/*
+					if (file.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
 					{
-						Console.WriteLine($"{fileName} was already declared!! Merging...");
-						filesDictionary[fileName] = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(filesDictionary[fileName]) + textContent);
+						Console.WriteLine($"{relativeName} was already declared!! Merging...");
+						MergeCsv(textContent, file, ref filesDictionary);
 						continue;
 					}
-
-					Console.WriteLine($"{fileName} was already declared!! Skipping...");
+					*/
+					Console.WriteLine($"{relativeName} was already declared!! Skipping...");
 					continue;
 				}
 
-				filesDictionary.Add(fileName, Encoding.UTF8.GetBytes(textContent));
+				filesDictionary.Add(relativeName, Encoding.UTF8.GetBytes(textContent));
 			}
 
-			var bsonFile = Path.GetFileName(targetDir) + ".bson";
-			var outputPath = Path.Combine(Path.GetDirectoryName(targetDir), bsonFile);
+			var bsonFile = directory.Name + ".bson";
+			var backupOutput = Path.Combine(directory.Parent?.FullName ?? string.Empty, bsonFile);
+
+			var outputPath = string.IsNullOrEmpty(outputName) ? backupOutput : outputName;
 
 			using (var bsonFileStream = new FileStream(outputPath, FileMode.CreateNew))
 			using (var writer = new BsonDataWriter(bsonFileStream))
@@ -56,8 +95,30 @@ namespace i18nEx.ZipBsonPacker
 				serializer.Serialize(writer, filesDictionary);
 			}
 
-
 			Console.WriteLine($"Done, saved file to {outputPath}");
 		}
+
+		/*
+		private static void MergeCsv(string textContent, FileInfo file, ref Dictionary<string, byte[]> filesDictionary)
+		{
+			var lines = textContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+			if (lines.Length <= 1)
+			{
+				return;
+			}
+
+			var previousFile = Encoding.UTF8.GetString(filesDictionary[file.Name])
+				.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+			var deDuped = previousFile
+				.Concat(lines.Skip(1))
+				.Distinct();
+
+			var result = string.Join(Environment.NewLine, deDuped, 0, deDuped.Count() - 1);
+
+			filesDictionary[file.Name] = Encoding.UTF8.GetBytes(result);
+		}
+		*/
 	}
 }
