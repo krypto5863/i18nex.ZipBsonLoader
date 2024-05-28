@@ -87,7 +87,7 @@ namespace i18nex.ZipBsonLoader
 
 			if (!Directory.Exists(directory))
 			{
-				Logger.LogInfo($"{directory} not found. Nothing will be loaded...");
+				Logger.LogWarning($"{directory} not found. Nothing will be loaded...");
 				return completeDictionary;
 			}
 
@@ -95,11 +95,11 @@ namespace i18nex.ZipBsonLoader
 
 			foreach (var zipPath in Directory.GetFiles(directory, "*.zip", SearchOption.AllDirectories))
 			{
-				Logger.LogInfo($"Processing {Path.GetFileName(zipPath)}");
+				Logger.LogDebug($"Processing {Path.GetFileName(zipPath)}");
 
 				using (var zip = new ZipFile(zipPath))
 				{
-					Logger.LogInfo($"Loaded {Path.GetFileName(zipPath)}");
+					Logger.LogDebug($"Loaded {Path.GetFileName(zipPath)}");
 
 					foreach (ZipEntry zFile in zip)
 					{
@@ -114,7 +114,7 @@ namespace i18nex.ZipBsonLoader
 							continue;
 						}
 
-						Logger.LogInfo($"Reading Bson in {Path.GetFileName(zipPath)}");
+						Logger.LogInfo($"Reading {zFile.Name} in {Path.GetFileName(zipPath)}");
 
 						using (var reader = new BsonReader(zip.GetInputStream(zFile)))
 						{
