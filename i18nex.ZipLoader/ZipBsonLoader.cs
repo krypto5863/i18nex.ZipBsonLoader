@@ -11,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using BepInEx;
+using File = System.IO.File;
 
 namespace i18nex.ZipBsonLoader
 {
@@ -91,17 +92,30 @@ namespace i18nex.ZipBsonLoader
 				return completeDictionary;
 			}
 
-			//Logger.LogDebug($"Searching for zip files in {Path.GetFileName(directory)}");
+            var filesInFolder = Directory
+                .GetFiles(directory, "*", SearchOption.AllDirectories)
+                .OrderBy(m => m, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
 
-			foreach (var zipPath in Directory.GetFiles(directory, "*.zip", SearchOption.AllDirectories))
+            //Logger.LogDebug($"Searching for zip files in {Path.GetFileName(directory)}");
+            foreach (var bsonFile in filesInFolder
+                         .Where(m => m.EndsWith(".bson", StringComparison.OrdinalIgnoreCase)))
+            {
+                Logger.LogInfo($"Reading loose {Path.GetFileName(bsonFile)}");
+                LoadBsonFunc(File.Open(bsonFile, FileMode.Open));
+            }
+
+            foreach (var zipPath in filesInFolder
+                         .Where(m => m.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
 			{
 				Logger.LogDebug($"Processing {Path.GetFileName(zipPath)}");
 
-				using (var zip = new ZipFile(zipPath))
+                using (var zip = new ZipFile(zipPath))
 				{
 					Logger.LogDebug($"Loaded {Path.GetFileName(zipPath)}");
 
 					foreach (ZipEntry zFile in zip)
+						                                            
 					{
 						if (!zFile.IsFile)
 						{
@@ -114,29 +128,36 @@ namespace i18nex.ZipBsonLoader
 							continue;
 						}
 
-						Logger.LogInfo($"Reading {zFile.Name} in {Path.GetFileName(zipPath)}");
+                        if (!zFile.Name.EndsWith(".bson", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
 
-						using (var reader = new BsonReader(zip.GetInputStream(zFile)))
-						{
-							var serializer = new JsonSerializer();
-							var dictionary = serializer.Deserialize<Dictionary<string, byte[]>>(reader);
-
-							Logger.LogDebug($"{Path.GetFileName(zFile.Name)} has {dictionary.Count} files in it!");
-
-							foreach (var file in dictionary)
-							{
-								if (completeDictionary.ContainsKey(file.Key) == false)
-								{
-									completeDictionary[file.Key] = file.Value;
-								}
-							}
-						}
-					}
+                        Logger.LogInfo($"Reading {zFile.Name} in {Path.GetFileName(zipPath)}");
+                        LoadBsonFunc(zip.GetInputStream(zFile));
+                    }
 				}
 			}
 
 			return completeDictionary;
-		}
+
+            void LoadBsonFunc(Stream bsonFile, string fileName = "")
+            {
+                using (var reader = new BsonReader(bsonFile))
+                {
+                    var serializer = new JsonSerializer();
+                    var dictionary = serializer.Deserialize<Dictionary<string, byte[]>>(reader);
+
+                    foreach (var file in dictionary)
+                    {
+                        if (completeDictionary.ContainsKey(file.Key) == false)
+                        {
+                            completeDictionary[file.Key] = file.Value;
+                        }
+                    }
+                }
+            }
+        }
 
 		public Dictionary<string, ITranslationAsset> TexturesLoad()
 		{
