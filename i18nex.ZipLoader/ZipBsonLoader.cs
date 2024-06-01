@@ -27,6 +27,7 @@ namespace i18nex.ZipBsonLoader
 
 		internal static SortedDictionary<string, IEnumerable<string>> UiDirectoryTree = new SortedDictionary<string, IEnumerable<string>>(StringComparer.InvariantCultureIgnoreCase);
 
+		[Obsolete("Obsolete")]
 		public void SelectLanguage(string name, string path, IniFile config)
 		{
 			Logger.LogInfo($"Loading language \"{name}\"");
@@ -55,7 +56,7 @@ namespace i18nex.ZipBsonLoader
 		/// <summary>
 		/// Returns a dictionary of the files of the given folder and with the following search pattern. The key is the full path of the file.
 		/// </summary>
-		/// <param name="type"></param>
+		/// <param name="directory"></param>
 		/// <param name="searchPattern"></param>
 		/// <returns></returns>
 		public Dictionary<string, ITranslationAsset> GetLooseTranslationFiles(string directory, string searchPattern)
@@ -81,6 +82,7 @@ namespace i18nex.ZipBsonLoader
 		/// </summary>
 		/// <param name="directory">The directory where zip files will be loaded from.</param>
 		/// <returns>A dictionary, the keys are the relative paths of the file that was packed, in relation to the directory selected at packing time. And the value is the byte array contents.</returns>
+		[Obsolete("Obsolete")]
 		public Dictionary<string, byte[]> LoadZipFiles(string directory)
 		{
 			var completeDictionary = new Dictionary<string, byte[]>();
@@ -166,6 +168,7 @@ namespace i18nex.ZipBsonLoader
 			return GetLooseTranslationFiles(folderPath, searchPattern);
 		}
 
+		[Obsolete("Obsolete")]
 		public Dictionary<string, ITranslationAsset> ScriptLoad()
 		{
 			const string searchPattern = "*.txt";
@@ -202,6 +205,7 @@ namespace i18nex.ZipBsonLoader
 			return resultDictionary;
 		}
 
+		[Obsolete("Obsolete")]
 		public Dictionary<string, ITranslationAsset> UiLoad(out SortedDictionary<string, IEnumerable<string>> directoryTree)
 		{
 			const string searchPattern = "*.csv";

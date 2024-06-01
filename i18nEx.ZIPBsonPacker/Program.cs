@@ -15,41 +15,92 @@ namespace i18nEx.ZipBsonPacker
 
 			var rootCommand = new RootCommand("A simple CLI tool to un/pack Bson files for usage with the ZipBsonLoader");
 
-			var packCommand = new Command(
-				name: "pack",
-				description: "The directory which contains your Tex files.");
-
-			rootCommand.AddCommand(packCommand);
-
-			var directoryOption =
-				new Option<DirectoryInfo>(aliases: new[] { "--directory", "-d" },
-					description: "Directory to be packed.")
-				{
-					IsRequired = true
-				};
-
-			var doCompressionOption =
-				new Option<bool>(
-					aliases: new[] { "--compress", "-c" },
-					description: "Compress the Bson to a zip file. Not suggested.");
-
-			var outputPathOption =
-				new Option<string>(aliases: new[] { "--output", "-o" }, "The full path to output the file, including the file name.")
-				{
-					IsRequired = true
-				};
-
-			packCommand.AddOption(directoryOption);
-			packCommand.AddOption(doCompressionOption);
-			packCommand.AddOption(outputPathOption);
-
-			packCommand.SetHandler((directory, compression, outputName) =>
 			{
-				PackBsonFile(directory, outputName, compression);
-			},
-			directoryOption, doCompressionOption, outputPathOption);
+				var packCommand = new Command(
+					name: "pack",
+					description: "Packs a directory into a single BSON file.");
+
+				rootCommand.AddCommand(packCommand);
+
+				var directoryOption =
+					new Option<DirectoryInfo>(aliases: ["--directory", "-d"],
+						description: "Directory to be packed.")
+					{
+						IsRequired = true
+					};
+
+				var doCompressionOption =
+					new Option<bool>(
+						aliases: ["--compress", "-c"],
+						description: "Compress the Bson to a zip file. Not suggested.");
+
+				var outputPathOption =
+					new Option<string>(aliases: ["--output", "-o"],
+						"The full path to output the file, including the file name.")
+					{
+						IsRequired = true
+					};
+
+				packCommand.AddOption(directoryOption);
+				packCommand.AddOption(doCompressionOption);
+				packCommand.AddOption(outputPathOption);
+
+				packCommand.SetHandler(
+					PackBsonFile,
+					directoryOption, outputPathOption, doCompressionOption);
+			}
+			{
+				var unpackCommand = new Command(
+					name: "unpack",
+					description: "Unpacks a BSON file into a directory.");
+
+				rootCommand.AddCommand(unpackCommand);
+
+				var fileOption =
+					new Option<FileInfo>(aliases: ["--file", "-f"],
+						description: "BSON file to be unpacked.")
+					{
+						IsRequired = true
+					};
+
+				var unpackDirectory =
+					new Option<DirectoryInfo>(aliases: ["--output", "-o"],
+						description: "Directory to place the unpacked files in.")
+					{
+						IsRequired = true
+					};
+
+				unpackCommand.AddOption(fileOption);
+				unpackCommand.AddOption(unpackDirectory);
+
+				unpackCommand.SetHandler(
+					UnpackBsonFile,
+					fileOption, unpackDirectory);
+			}
 
 			return await rootCommand.InvokeAsync(args);
+		}
+
+		private static void UnpackBsonFile(FileInfo bsonFile, DirectoryInfo outputDirectory)
+		{
+			using var bsonFileStream = bsonFile.OpenRead();
+			using var bsonReader = new BsonDataReader(bsonFileStream);
+
+			var serializer = new JsonSerializer();
+			var deserializeJsonFile = serializer.Deserialize<Dictionary<string, byte[]>> (bsonReader);
+
+			if (deserializeJsonFile == null)
+			{
+				return;
+			}
+
+			var counter = 0;
+			foreach (var file in deserializeJsonFile)
+			{
+				Console.WriteLine($"{++counter}/{deserializeJsonFile.Count} : {file.Key}...");
+				var filePath = Path.Combine(outputDirectory.FullName, Path.GetFileNameWithoutExtension(bsonFile.Name), file.Key);
+				File.WriteAllBytes(filePath, file.Value);
+			}
 		}
 
 		private static void PackBsonFile(DirectoryInfo directory, string outputName, bool compression = false)
