@@ -141,7 +141,7 @@ namespace i18nex.ZipBsonLoader
 
 			return completeDictionary;
 
-            void LoadBsonFunc(Stream bsonFile, string fileName = "")
+            void LoadBsonFunc(Stream bsonFile)
             {
                 using (var reader = new BsonReader(bsonFile))
                 {
