@@ -30,5 +30,5 @@ The packer is a console utility, so you must run it via something like command p
 Say you had a Scripts folder that is incredibly large and you'd like to pack it using our tool. You would simply supply the Scripts folder you wish to target, and you'd recieve a BSON file you can zip and place in the Scripts folder, deleting your loose files afterwards.
 
 ## Guidelines:
-- Use deflate or deflate64
 - Use zip. Must be zip. No exceptions.
+- Use deflate or deflate64
