@@ -28,3 +28,7 @@ Loader=i18nex.ZipLoader
 The packer is a console utility, so you must run it via something like command prompt or powershell. Running it through there will allow you to see a list of commands. As the input, you'd pass in the contents of what would normally be read in your i18nex folder.
 
 Say you had a Scripts folder that is incredibly large and you'd like to pack it using our tool. You would simply supply the Scripts folder you wish to target, and you'd recieve a BSON file you can zip and place in the Scripts folder, deleting your loose files afterwards.
+
+## Guidelines:
+- Use deflate or deflate64
+- Use zip. Must be zip. No exceptions.
