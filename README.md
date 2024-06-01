@@ -5,6 +5,7 @@ A simple loader that allows i18nex to load zipped bson files. Bson files are cre
 This was made in an attempt to compress the gross amount of script files a translation of this game takes. It was simply unacceptable and the load times were way too long. This seeks to perfectly balance size and speed.
 
 - Supports BSON packed and zipped UI and Script files.
+- Prioritizes loose (unpacked and unzipped) files over packed and zipped files, allowing you to add your own dumped translations or make quick changes.
 - Textures are not supported, they must be left unpacked and unzipped.
 
 # Requires
