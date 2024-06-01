@@ -260,7 +260,8 @@ namespace i18nex.ZipBsonLoader
 				
 				Logger.LogInfo($"Added unit {unitName} and file {relativeToUnit} as {csvFile.Key}");
 				*/
-				const string packageGhostFolder = "zzzzPackagedCsvFiles";
+				//Prepends the final character in the unicode spectrum, so it's always dead last when sorted.
+				const string packageGhostFolder = "\udbff\udfffPackagedCsvFiles";
 				var fakeRelativePath = Path.Combine(packageGhostFolder, csvFile.Key ?? string.Empty);
 
 				if (tempDirectoryTree.TryGetValue(packageGhostFolder, out _) == false)
