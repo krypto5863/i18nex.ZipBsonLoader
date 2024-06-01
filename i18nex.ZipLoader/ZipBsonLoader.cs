@@ -94,30 +94,30 @@ namespace i18nex.ZipBsonLoader
 				return completeDictionary;
 			}
 
-            var filesInFolder = Directory
-                .GetFiles(directory, "*", SearchOption.AllDirectories)
-                .OrderBy(m => m, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+			var filesInFolder = Directory
+				.GetFiles(directory, "*", SearchOption.AllDirectories)
+				.OrderBy(m => m, StringComparer.OrdinalIgnoreCase)
+				.ToArray();
 
-            //Logger.LogDebug($"Searching for zip files in {Path.GetFileName(directory)}");
-            foreach (var bsonFile in filesInFolder
-                         .Where(m => m.EndsWith(".bson", StringComparison.OrdinalIgnoreCase)))
-            {
-                Logger.LogInfo($"Reading loose {Path.GetFileName(bsonFile)}");
-                LoadBsonFunc(File.Open(bsonFile, FileMode.Open));
-            }
+			//Logger.LogDebug($"Searching for zip files in {Path.GetFileName(directory)}");
+			foreach (var bsonFile in filesInFolder
+						 .Where(m => m.EndsWith(".bson", StringComparison.OrdinalIgnoreCase)))
+			{
+				Logger.LogInfo($"Reading loose {Path.GetFileName(bsonFile)}");
+				LoadBsonFunc(File.Open(bsonFile, FileMode.Open));
+			}
 
-            foreach (var zipPath in filesInFolder
-                         .Where(m => m.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
+			foreach (var zipPath in filesInFolder
+						 .Where(m => m.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
 			{
 				Logger.LogDebug($"Processing {Path.GetFileName(zipPath)}");
 
-                using (var zip = new ZipFile(zipPath))
+				using (var zip = new ZipFile(zipPath))
 				{
 					Logger.LogDebug($"Loaded {Path.GetFileName(zipPath)}");
 
 					foreach (ZipEntry zFile in zip)
-						                                            
+
 					{
 						if (!zFile.IsFile)
 						{
@@ -130,36 +130,36 @@ namespace i18nex.ZipBsonLoader
 							continue;
 						}
 
-                        if (!zFile.Name.EndsWith(".bson", StringComparison.OrdinalIgnoreCase))
-                        {
-                            continue;
-                        }
+						if (!zFile.Name.EndsWith(".bson", StringComparison.OrdinalIgnoreCase))
+						{
+							continue;
+						}
 
-                        Logger.LogInfo($"Reading {zFile.Name} in {Path.GetFileName(zipPath)}");
-                        LoadBsonFunc(zip.GetInputStream(zFile));
-                    }
+						Logger.LogInfo($"Reading {zFile.Name} in {Path.GetFileName(zipPath)}");
+						LoadBsonFunc(zip.GetInputStream(zFile));
+					}
 				}
 			}
 
 			return completeDictionary;
 
-            void LoadBsonFunc(Stream bsonFile)
-            {
-                using (var reader = new BsonReader(bsonFile))
-                {
-                    var serializer = new JsonSerializer();
-                    var dictionary = serializer.Deserialize<Dictionary<string, byte[]>>(reader);
+			void LoadBsonFunc(Stream bsonFile)
+			{
+				using (var reader = new BsonReader(bsonFile))
+				{
+					var serializer = new JsonSerializer();
+					var dictionary = serializer.Deserialize<Dictionary<string, byte[]>>(reader);
 
-                    foreach (var file in dictionary)
-                    {
-                        if (completeDictionary.ContainsKey(file.Key) == false)
-                        {
-                            completeDictionary[file.Key] = file.Value;
-                        }
-                    }
-                }
-            }
-        }
+					foreach (var file in dictionary)
+					{
+						if (completeDictionary.ContainsKey(file.Key) == false)
+						{
+							completeDictionary[file.Key] = file.Value;
+						}
+					}
+				}
+			}
+		}
 
 		public Dictionary<string, ITranslationAsset> TexturesLoad()
 		{
@@ -192,7 +192,7 @@ namespace i18nex.ZipBsonLoader
 			foreach (var scriptFile in packedScriptFiles)
 			{
 				var fileName = Path.GetFileName(scriptFile.Key).ToLower();
-				
+
 				if (looseScriptFilesAdded.Contains(fileName))
 				{
 					continue;
@@ -235,8 +235,8 @@ namespace i18nex.ZipBsonLoader
 				}
 
 				tempDirectoryTree[unitPath].Add(relativeFileName);
-				resultDictionary[Path.Combine(unitPath,relativeFileName)] = csvFile.Value;
-				Logger.LogDebug($"Added unit {unitPath} and file {relativeFileName} as {Path.Combine(unitPath,relativeFileName)}");
+				resultDictionary[Path.Combine(unitPath, relativeFileName)] = csvFile.Value;
+				Logger.LogDebug($"Added unit {unitPath} and file {relativeFileName} as {Path.Combine(unitPath, relativeFileName)}");
 			}
 
 			foreach (var csvFile in uiFiles)

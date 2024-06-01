@@ -87,7 +87,7 @@ namespace i18nEx.ZipBsonPacker
 			using var bsonReader = new BsonDataReader(bsonFileStream);
 
 			var serializer = new JsonSerializer();
-			var deserializeJsonFile = serializer.Deserialize<Dictionary<string, byte[]>> (bsonReader);
+			var deserializeJsonFile = serializer.Deserialize<Dictionary<string, byte[]>>(bsonReader);
 
 			if (deserializeJsonFile == null)
 			{

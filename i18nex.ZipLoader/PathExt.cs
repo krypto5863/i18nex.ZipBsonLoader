@@ -1,5 +1,5 @@
-﻿using System.IO;
-using System;
+﻿using System;
+using System.IO;
 
 namespace i18nex.ZipBsonLoader
 {
@@ -45,6 +45,7 @@ namespace i18nex.ZipBsonLoader
 
 			return relativePath.Replace('/', Path.DirectorySeparatorChar);
 		}
+
 		/// <summary>
 		/// Returns the first found directory in the given path.
 		/// </summary>
@@ -76,6 +77,7 @@ namespace i18nex.ZipBsonLoader
 			// Return the substring before the first slash
 			return path.Substring(0, index);
 		}
+
 		public static string GetPathAfterDirectory(string fullPath, string directoryName)
 		{
 			// Split the full path into directories
