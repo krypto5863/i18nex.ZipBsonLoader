@@ -1,74 +1,29 @@
-# i18nex.ZipLoader
+# i18nex.ZipBsonLoader
 
-![2022-03-27 22 34 39](https://user-images.githubusercontent.com/20321215/160284108-18c197d5-42d7-4fc4-ac7d-a0adf47cf3a8.png)  
+A simple loader that allows i18nex to load zipped bson files. Bson files are created with our included console tool. The file is zipped by the user afterwards.
 
-Loader plugin of i18nex plugin
+This was made in an attempt to compress the gross amount of script files a translation of this game takes. It was simply unacceptable and the load times were way too long. This seeks to perfectly balance size and speed.
 
-Script zip support  
-Script txt support  
-Textures zip support  
-Textures png support  
-UI zip support (Read UI zip, csv Manual)  
-UI csv support  
+- Supports BSON packed and zipped UI and Script files.
+- Textures are not supported, they must be left unpacked and unzipped.
 
+# Requires
 
-# need
+i18nEx: [https://github.com/ghorsington/COM3D2.i18nEx  ](https://github.com/Pain-Brioche/COM3D2.i18nEx)
 
-i18nEx https://github.com/ghorsington/COM3D2.i18nEx  
+# How to use the loader
 
+Simply place the English and Loader folders in your i18nex folder in the root of your game. If you wish to load other languages, copy and paste the English folder, and rename it to your desired language (ex: Swahili).
 
-# How to use  
+Zipped BSON files are to be placed in their appropriate folders. So, ZipBsons containing scripts go in the `English/Scripts`, ZipBsons containing UI csvs go into the `English/UI` folder.
 
-- easy input  
-COM3D2\i18nEx\loaders\i18nex.ZipLoader.dll  
-COM3D2\i18nEx\{lang}\config.ini  
-
-- config.ini file  
+If you want to do this process manually, then create a new folder and name it your desired language (Ex: Marshallese), and then create a file named `config.ini` file with the following contents:
+```
 [Info]  
 Loader=i18nex.ZipLoader  
+```
+# How to use the packer
 
-* Create "loaders" folder in "{game folder}\i18nEx" folder and put loader DLL into it  
-* Edit "config.ini" Set Loader in the [Info] section to the name of the DLL (without the .dll)  
+The packer is a console utility, so you must run it via something like command prompt or powershell. Running it through there will allow you to see a list of commands. As the input, you'd pass in the contents of what would normally be read in your i18nex folder.
 
-![2022-03-28 18 10 04](https://user-images.githubusercontent.com/20321215/160365690-da5ae1d1-2a4c-48e1-bc2c-53c0c3af7f69.png)  
-![2022-03-28 18 09 44](https://user-images.githubusercontent.com/20321215/160365683-8f185549-f961-4945-a6c1-c8cc2a3a728f.png)  
-![2022-03-28 18 12 16](https://user-images.githubusercontent.com/20321215/160366016-6e1c9ea4-4d01-4f6f-8d8c-7ca9dc989d91.png)
-
-
-# support
-
-- Script  
-COM3D2\i18nEx\\{lang}\Script\\\*.zip (sub Directory include)  
-COM3D2\i18nEx\\{lang}\Script\\\*.txt (sub Directory include)  
-
-- Textures  
-COM3D2\i18nEx\\{lang}\Textures\\\*.zip (sub Directory include)  
-COM3D2\i18nEx\\{lang}\Textures\\\*.png (sub Directory include)  
-
-- UI  (Read UI zip, csv Manual)
-COM3D2\i18nEx\\{lang}\UI\\\*.zip (sub Directory include.)  
-COM3D2\i18nEx\\{lang}\UI\\{type}\\\*.csv (sub Directory include. Same as the existing i18nex plug-in method)  
-COM3D2\i18nEx\\{lang}\UI\\{type}\\\*.csv (하위 디렉토리 포함. 기존 i18nex 플러그인 방식과 같은)  
-
-
-## UI zip, csv Manual  
-
-UI csv는 SortedDictionary<string, IEnumerable<string>> 구조로만 처리됩니다.  
-UI csv is handled only with SortedDictionary<string, IEnumerable<string>> structures.  
-
-ex) SortedDictionary<"top Dictionary name or zip file name or top Dictionary name in zip", IEnumerable<"csv file name">>  
-
-ex1)
-![2022-03-28 19 17 07](https://user-images.githubusercontent.com/20321215/160378005-17d3f601-224c-4506-b117-fd60bbfbb2c4.png)  
-
-ex2)
-![2022-03-28 19 18 24](https://user-images.githubusercontent.com/20321215/160378015-93f327c1-ec60-418b-8228-89d81dbfba4c.png)  
-
-ex3)
- ![2022-03-28 19 24 54](https://user-images.githubusercontent.com/20321215/160379038-3e55b50d-6bfc-414f-8631-3b74533a1e8c.png)
-
- 
-
-# ghorsington's comment
-
- The way i18nEx handles translation loaders right now is that your custom one will replace the default loader.
+Say you had a Scripts folder that is incredibly large and you'd like to pack it using our tool. You would simply supply the Scripts folder you wish to target, and you'd recieve a BSON file you can zip and place in the Scripts folder, deleting your loose files afterwards.
