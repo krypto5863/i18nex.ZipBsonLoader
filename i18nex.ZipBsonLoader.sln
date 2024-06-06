@@ -5,7 +5,9 @@ VisualStudioVersion = 17.0.32112.339
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "i18nex.ZipBsonLoader", "i18nex.ZipLoader\i18nex.ZipBsonLoader.csproj", "{8BD6143B-800B-4626-BE29-5E18E4356D0A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "i18nEx.ZipBsonPacker", "i18nEx.ZIPBsonPacker\i18nEx.ZipBsonPacker.csproj", "{9395460C-BB8D-421A-8588-334DB8FEAE88}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "i18nEx.ZipBsonPacker", "i18nEx.ZIPBsonPacker\i18nEx.ZipBsonPacker.csproj", "{9395460C-BB8D-421A-8588-334DB8FEAE88}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "COM3D2.i18nEx.Core", "..\i18nEx\COM3D2.i18nEx.Core\COM3D2.i18nEx.Core.csproj", "{F1C4EA27-9238-4539-9903-B4CE0364116C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{9395460C-BB8D-421A-8588-334DB8FEAE88}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9395460C-BB8D-421A-8588-334DB8FEAE88}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9395460C-BB8D-421A-8588-334DB8FEAE88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F1C4EA27-9238-4539-9903-B4CE0364116C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F1C4EA27-9238-4539-9903-B4CE0364116C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F1C4EA27-9238-4539-9903-B4CE0364116C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F1C4EA27-9238-4539-9903-B4CE0364116C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

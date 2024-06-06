@@ -10,7 +10,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
-using BepInEx;
 using File = System.IO.File;
 
 namespace i18nex.ZipBsonLoader
@@ -25,8 +24,6 @@ namespace i18nex.ZipBsonLoader
 		internal static Dictionary<string, ITranslationAsset> Textures = new Dictionary<string, ITranslationAsset>();
 		internal static Dictionary<string, ITranslationAsset> UIs = new Dictionary<string, ITranslationAsset>();
 
-		internal static SortedDictionary<string, IEnumerable<string>> UiDirectoryTree = new SortedDictionary<string, IEnumerable<string>>(StringComparer.InvariantCultureIgnoreCase);
-
 		[Obsolete("Obsolete")]
 		public void SelectLanguage(string name, string path, IniFile config)
 		{
@@ -39,9 +36,8 @@ namespace i18nex.ZipBsonLoader
 			stopwatch.Start();
 
 			Textures = TexturesLoad();
-			UIs = UiLoad(out var directoryTree);
+			UIs = UiLoad();
 			Scripts = ScriptLoad();
-			UiDirectoryTree = directoryTree;
 
 			Logger.LogInfo($"Done loading everything @ {stopwatch.Elapsed}");
 		}
@@ -51,6 +47,41 @@ namespace i18nex.ZipBsonLoader
 			Logger.LogInfo($"Unloading language \"{CurrentLanguage}\"");
 			CurrentLanguage = null;
 			_langPath = null;
+		}
+
+		public Dictionary<string, ITranslationAsset> TexturesLoad()
+		{
+			const string searchPattern = "*.png";
+			var folderPath = Path.Combine(_langPath, "Textures");
+			return GetLooseTranslationFiles(folderPath, searchPattern);
+		}
+
+		[Obsolete("Obsolete")]
+		public Dictionary<string, ITranslationAsset> ScriptLoad()
+		{
+			const string searchPattern = "*.txt";
+			var folderPath = Path.Combine(_langPath, "Script");
+			var scriptFiles = GetLooseTranslationFiles(folderPath, searchPattern);
+			var bsonScriptFiles = LoadBsonFiles(folderPath);
+			var packedScriptFiles = LoadZipFiles(folderPath);
+
+			var resultDictionary = LoadTranslationAssetsIntoDictionary(folderPath, scriptFiles, bsonScriptFiles, packedScriptFiles);
+
+			return resultDictionary;
+		}
+
+		[Obsolete("Obsolete")]
+		public Dictionary<string, ITranslationAsset> UiLoad()
+		{
+			const string searchPattern = "*.csv";
+			var folderPath = Path.Combine(_langPath, "UI");
+			var csvFiles = GetLooseTranslationFiles(folderPath, searchPattern);
+			var bsonCsvFiles = LoadBsonFiles(folderPath);
+			var packedCsvFiles = LoadZipFiles(folderPath);
+
+			var resultDictionary = LoadTranslationAssetsIntoDictionary(folderPath, csvFiles, bsonCsvFiles, packedCsvFiles);
+
+			return resultDictionary;
 		}
 
 		/// <summary>
@@ -78,6 +109,38 @@ namespace i18nex.ZipBsonLoader
 		}
 
 		/// <summary>
+		/// Loads all loose BSONs in the specified directory.
+		/// </summary>
+		/// <param name="directory">The directory where bson files will be loaded from.</param>
+		/// <returns>A dictionary, the keys are the relative paths of the file that was packed, in relation to the directory selected at packing time. And the value is the byte array contents.</returns>
+		[Obsolete("Obsolete")]
+		public Dictionary<string, byte[]> LoadBsonFiles(string directory)
+		{
+			var completeDictionary = new Dictionary<string, byte[]>();
+			ZipConstants.DefaultCodePage = Encoding.UTF8.CodePage;
+
+			if (!Directory.Exists(directory))
+			{
+				Logger.LogWarning($"{directory} not found. Nothing will be loaded...");
+				return completeDictionary;
+			}
+
+			var filesInFolder = Directory
+				.GetFiles(directory, "*.bson", SearchOption.AllDirectories)
+				.OrderBy(m => m, StringComparer.OrdinalIgnoreCase)
+				.ToArray();
+
+			//Logger.LogDebug($"Searching for zip files in {Path.GetFileName(directory)}");
+			foreach (var bsonFile in filesInFolder)
+			{
+				Logger.LogInfo($"Reading loose {Path.GetFileName(bsonFile)}");
+				LoadBsonFile(File.Open(bsonFile, FileMode.Open), Path.GetFileNameWithoutExtension(bsonFile), ref completeDictionary);
+			}
+
+			return completeDictionary;
+		}
+
+		/// <summary>
 		/// Loads all BSON containing ZIP files in the specified directory.
 		/// </summary>
 		/// <param name="directory">The directory where zip files will be loaded from.</param>
@@ -95,20 +158,11 @@ namespace i18nex.ZipBsonLoader
 			}
 
 			var filesInFolder = Directory
-				.GetFiles(directory, "*", SearchOption.AllDirectories)
+				.GetFiles(directory, "*.zip", SearchOption.AllDirectories)
 				.OrderBy(m => m, StringComparer.OrdinalIgnoreCase)
 				.ToArray();
 
-			//Logger.LogDebug($"Searching for zip files in {Path.GetFileName(directory)}");
-			foreach (var bsonFile in filesInFolder
-						 .Where(m => m.EndsWith(".bson", StringComparison.OrdinalIgnoreCase)))
-			{
-				Logger.LogInfo($"Reading loose {Path.GetFileName(bsonFile)}");
-				LoadBsonFunc(File.Open(bsonFile, FileMode.Open));
-			}
-
-			foreach (var zipPath in filesInFolder
-						 .Where(m => m.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
+			foreach (var zipPath in filesInFolder)
 			{
 				Logger.LogDebug($"Processing {Path.GetFileName(zipPath)}");
 
@@ -124,157 +178,71 @@ namespace i18nex.ZipBsonLoader
 							continue;
 						}
 
-						if (!zFile.CanDecompress)
-						{
-							Logger.LogInfo($"Can't Decompress {zFile.Name}");
-							continue;
-						}
-
 						if (!zFile.Name.EndsWith(".bson", StringComparison.OrdinalIgnoreCase))
 						{
 							continue;
 						}
 
+						if (!zFile.CanDecompress)
+						{
+							Logger.LogWarning($"Can't Decompress {zFile.Name}");
+							continue;
+						}
+
 						Logger.LogInfo($"Reading {zFile.Name} in {Path.GetFileName(zipPath)}");
-						LoadBsonFunc(zip.GetInputStream(zFile));
+						LoadBsonFile(zip.GetInputStream(zFile), Path.GetFileNameWithoutExtension(zFile.Name), ref completeDictionary);
 					}
 				}
 			}
 
 			return completeDictionary;
+		}
 
-			void LoadBsonFunc(Stream bsonFile)
+		[Obsolete("Out of date usage of the BSONReader.")]
+		private static void LoadBsonFile(Stream bsonFile, string fileName, ref Dictionary<string, byte[]> completeDictionary)
+		{
+			using (var reader = new BsonReader(bsonFile))
 			{
-				using (var reader = new BsonReader(bsonFile))
-				{
-					var serializer = new JsonSerializer();
-					var dictionary = serializer.Deserialize<Dictionary<string, byte[]>>(reader);
+				var serializer = new JsonSerializer();
+				var dictionary = serializer.Deserialize<Dictionary<string, byte[]>>(reader);
 
-					foreach (var file in dictionary)
+				foreach (var file in dictionary)
+				{
+					if (completeDictionary.ContainsKey(file.Key) == false)
 					{
-						if (completeDictionary.ContainsKey(file.Key) == false)
-						{
-							completeDictionary[file.Key] = file.Value;
-						}
+						completeDictionary[Path.Combine(fileName, file.Key)] = file.Value;
 					}
 				}
 			}
 		}
 
-		public Dictionary<string, ITranslationAsset> TexturesLoad()
+		private static Dictionary<string, ITranslationAsset> LoadTranslationAssetsIntoDictionary(string folderPath, Dictionary<string, ITranslationAsset> looseFiles,
+			Dictionary<string, byte[]> bsonFiles, Dictionary<string, byte[]> zippedFiles)
 		{
-			const string searchPattern = "*.png";
-			var folderPath = Path.Combine(_langPath, "Textures");
-			return GetLooseTranslationFiles(folderPath, searchPattern);
-		}
-
-		[Obsolete("Obsolete")]
-		public Dictionary<string, ITranslationAsset> ScriptLoad()
-		{
-			const string searchPattern = "*.txt";
-			var folderPath = Path.Combine(_langPath, "Script");
-			var scriptFiles = GetLooseTranslationFiles(folderPath, searchPattern);
-			var packedScriptFiles = LoadZipFiles(folderPath);
+			const string bsonPrefix = "\udbff\udffd";
+			const string zipPrefix = "\udbff\udfff";
 
 			var resultDictionary = new Dictionary<string, ITranslationAsset>();
 
-			var looseScriptFilesAdded = new HashSet<string>();
-			var packedScriptFilesAdded = new HashSet<string>();
-
-			foreach (var scriptFile in scriptFiles)
+			foreach (var scriptFile in looseFiles)
 			{
-				var fileName = Path.GetFileName(scriptFile.Key).ToLower();
 				var relativePath = PathExt.GetRelativePath(folderPath, scriptFile.Key);
-				looseScriptFilesAdded.Add(fileName);
 				resultDictionary[relativePath] = scriptFile.Value;
+				//Logger.LogDebug($"Adding loose file as {relativePath}");
 			}
 
-			foreach (var scriptFile in packedScriptFiles)
+			foreach (var scriptFile in bsonFiles)
 			{
-				var fileName = Path.GetFileName(scriptFile.Key).ToLower();
-
-				if (looseScriptFilesAdded.Contains(fileName))
-				{
-					continue;
-				}
-
-				packedScriptFilesAdded.Add(fileName);
-				resultDictionary[scriptFile.Key] = new PackagedAsset(scriptFile.Value);
+				resultDictionary[bsonPrefix + scriptFile.Key] = new PackagedAsset(scriptFile.Value);
+				//Logger.LogDebug($"Adding BSON packed file as {bsonPrefix + scriptFile.Key}");
 			}
 
-			return resultDictionary;
-		}
-
-		[Obsolete("Obsolete")]
-		public Dictionary<string, ITranslationAsset> UiLoad(out SortedDictionary<string, IEnumerable<string>> directoryTree)
-		{
-			const string searchPattern = "*.csv";
-			var uiFolderPath = Path.Combine(_langPath, "UI");
-			var looseCsvFiles = GetLooseTranslationFiles(uiFolderPath, searchPattern);
-			var uiFiles = LoadZipFiles(uiFolderPath);
-
-			var resultDictionary = new Dictionary<string, ITranslationAsset>();
-			var tempDirectoryTree = new SortedDictionary<string, List<string>>();
-
-			foreach (var csvFile in looseCsvFiles)
+			foreach (var scriptFile in zippedFiles)
 			{
-				var relativePath = PathExt.GetRelativePath(uiFolderPath, csvFile.Key);
-				Logger.LogDebug($"Relative unit path is {relativePath}, root is {PathExt.GetFirstDirectory(relativePath)}");
-				if (Path.GetDirectoryName(relativePath).IsNullOrWhiteSpace())
-				{
-					Logger.LogWarning($"Skipping {relativePath}, it has no unit.");
-					continue;
-				}
-
-				var unitPath = PathExt.GetFirstDirectory(relativePath);
-				var relativeFileName = PathExt.GetRelativePath(unitPath, relativePath);
-
-				if (tempDirectoryTree.TryGetValue(unitPath, out _) == false)
-				{
-					tempDirectoryTree[unitPath] = new List<string>();
-				}
-
-				tempDirectoryTree[unitPath].Add(relativeFileName);
-				resultDictionary[Path.Combine(unitPath, relativeFileName)] = csvFile.Value;
-				Logger.LogDebug($"Added unit {unitPath} and file {relativeFileName} as {Path.Combine(unitPath, relativeFileName)}");
+				resultDictionary[zipPrefix + scriptFile.Key] = new PackagedAsset(scriptFile.Value);
+				//Logger.LogDebug($"Adding BSON ZIPPED file as {zipPrefix + scriptFile.Key}");
 			}
 
-			foreach (var csvFile in uiFiles)
-			{
-				/*
-				if (Path.GetDirectoryName(csvFile.Key).IsNullOrWhiteSpace())
-				{
-					Logger.LogWarning($"Skipping {csvFile.Key}, it has no unit.");
-					continue;
-				}
-				var unitName = PathExt.GetFirstDirectory(csvFile.Key);
-				var relativeToUnit = PathExt.GetPathAfterDirectory(csvFile.Key, unitName);
-
-				if (tempDirectoryTree.TryGetValue(unitName, out _) == false)
-				{
-					tempDirectoryTree[unitName] = new List<string>();
-				}
-
-				tempDirectoryTree[unitName].Add(relativeToUnit);
-				resultDictionary[csvFile.Key] = new PackagedAsset(csvFile.Value);
-				
-				Logger.LogInfo($"Added unit {unitName} and file {relativeToUnit} as {csvFile.Key}");
-				*/
-				//Prepends the final character in the unicode spectrum, so it's always dead last when sorted.
-				const string packageGhostFolder = "\udbff\udfffPackagedCsvFiles";
-				var fakeRelativePath = Path.Combine(packageGhostFolder, csvFile.Key ?? string.Empty);
-
-				if (tempDirectoryTree.TryGetValue(packageGhostFolder, out _) == false)
-				{
-					tempDirectoryTree[packageGhostFolder] = new List<string>();
-				}
-
-				tempDirectoryTree[packageGhostFolder].Add(csvFile.Key);
-				resultDictionary[fakeRelativePath] = new PackagedAsset(csvFile.Value);
-				Logger.LogDebug($"Added unit {packageGhostFolder} and file {csvFile.Key} as {fakeRelativePath}");
-			}
-
-			directoryTree = new SortedDictionary<string, IEnumerable<string>>(tempDirectoryTree.ToDictionary(m => m.Key, r => r.Value as IEnumerable<string>), StringComparer.OrdinalIgnoreCase);
 			return resultDictionary;
 		}
 
@@ -288,10 +256,10 @@ namespace i18nex.ZipBsonLoader
 			return Textures.Keys;
 		}
 
-		public SortedDictionary<string, IEnumerable<string>> GetUITranslationFileNames()
+		public IEnumerable<string> GetUITranslationFileNames()
 		{
 			//Logger.LogDebug($"Returning tree, contains {UiDirectoryTree.Count} and the first collection of {UiDirectoryTree.First().Key} has {UiDirectoryTree.First().Value.Count()} items.");
-			return UiDirectoryTree;
+			return UIs.Keys;
 		}
 
 		public Stream GetStream(string path, Dictionary<string, ITranslationAsset> dic)
