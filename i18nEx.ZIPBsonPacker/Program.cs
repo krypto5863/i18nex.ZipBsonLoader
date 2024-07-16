@@ -99,6 +99,7 @@ namespace i18nEx.ZipBsonPacker
 			{
 				Console.WriteLine($"{++counter}/{deserializeJsonFile.Count} : {file.Key}...");
 				var filePath = Path.Combine(outputDirectory.FullName, Path.GetFileNameWithoutExtension(bsonFile.Name), file.Key);
+				Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? throw new InvalidOperationException());
 				File.WriteAllBytes(filePath, file.Value);
 			}
 		}
